@@ -23,6 +23,7 @@ The hosted app uses the `little-helpers-api` Supabase Edge Function, with public
 - App: https://little-helpers-family-quest.plainpapaya4.chatgpt.site
 - Sample adventure: https://little-helpers-family-quest.plainpapaya4.chatgpt.site/?demo=1
 - Supabase dashboard: https://supabase.com/dashboard/project/iuokuddczsrgvneqnaqn
+- Live Netlify app: https://pocket-money-helper.netlify.app
 
 The sample adventure saves its own example progress in browser storage. It never writes to the live database. Live family accounts start fresh.
 
@@ -52,16 +53,22 @@ Use invitations from your Netlify URL once deployed. The ChatGPT-hosted preview 
 1. Put this source in an empty GitHub repository, preserving the directory layout.
 2. In Netlify, choose **Import an existing project → GitHub**, then select that repository.
 3. Netlify reads `netlify.toml`: build command `npm run build`, publish directory `dist`, functions directory `netlify/functions`. No npm dependencies are required. Node 22 is selected.
-4. Set these environment variables for **Functions** in Netlify:
+4. To run the same-origin Netlify Functions backend, set these environment variables for **Functions** in Netlify:
    - `SUPABASE_URL`: your project's URL.
    - `SUPABASE_PUBLISHABLE_KEY`: a publishable API key from Supabase Settings → API Keys.
    - `SUPABASE_SECRET_KEY`: a secret API key from the same page. **Server only. Never put it in `dist/`, GitHub, chat, or a public-prefixed environment variable.**
-5. Deploy, then update Supabase's Site URL and redirect allowlist to the Netlify origin.
+5. Deploy, then update Supabase's Site URL to `https://pocket-money-helper.netlify.app` and add `https://pocket-money-helper.netlify.app/**` to the redirect allowlist. These return settings have been verified for the current live URL.
 6. Test parent sign-in and tablet pairing on the Netlify URL. The app automatically prefers the same-origin Netlify backend when its variables are configured, so the existing Edge Function does not need a new origin allowlist.
 
 If you want a different Supabase project, run `supabase/schema.sql` and then `supabase/parent-access.sql` once in that project's SQL editor and configure the three Netlify variables. Remove `dist/runtime.json` so it cannot fall back to the current hosted backend. Do not rerun the schema against the existing Little Helpers project: both setup migrations are already applied.
 
-The Netlify backend is included and covered by mocked HTTP tests. A Netlify deployment has not been created as part of the initial build.
+The app is now deployed on Netlify. Its current deployment uses the existing Supabase Edge backend through `dist/runtime.json`; the Edge function explicitly allows `https://pocket-money-helper.netlify.app`. This mode works without Netlify Function secrets. If the three Netlify variables above are configured, the app instead uses its same-origin Netlify Functions backend automatically. For a new domain, update Supabase's return URLs and either configure the same-origin backend or add that exact origin to the Edge allowlist.
+
+### Confirmation and password reset
+
+The sign-in screen includes **Forgot your password?**. Enter the parent account email to request a recovery link, then choose and confirm a new password after following the email. The app verifies the returned session with Supabase Auth before displaying the new-password form, removes session tokens from the URL, and saves the new password only through the authenticated Auth API. No family records or permissions change during recovery.
+
+Confirmation emails also return a verified session to the app, so a successful confirmation opens the parent dashboard (or invitation acceptance). Expired or previously used links show an explanation and sign-in/reset options. Email links are single use; always use the newest email. A generic **Failed to fetch** during family loading can indicate a missing origin allowlist entry even when the password has been accepted.
 
 ### Toy links
 
