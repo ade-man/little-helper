@@ -1,0 +1,8 @@
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {createHash} from 'node:crypto';
+mkdirSync('dist/shared',{recursive:true});
+copyFileSync('shared/domain.mjs','dist/shared/domain.mjs');
+const version=createHash('sha256').update(readFileSync('dist/app.mjs')).update(readFileSync('dist/style.css')).digest('hex').slice(0,12);
+const html=readFileSync('dist/index.html','utf8').replace(/\/style\.css(?:\?v=[a-f0-9]+)?/g,'/style.css?v='+version).replace(/\/app\.mjs(?:\?v=[a-f0-9]+)?/g,'/app.mjs?v='+version);
+writeFileSync('dist/index.html',html);
+console.log('Static app ready in dist/');
