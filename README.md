@@ -5,7 +5,7 @@ A tablet-friendly pocket-money adventure for a child, with a separate parent das
 ## What works
 
 - A child ticks off essential routines and homework, then sends them for parent approval.
-- Each approved essential earns one star. The configurable weekly threshold unlocks paid extra jobs.
+- Each approved essential earns a star. Paid jobs unlock only after every active essential has been approved **that day**. The requirement is always the number of active essentials; there is no manually configured threshold.
 - Daily tasks can be claimed once per calendar day; weekly tasks once per Monday–Sunday week.
 - Parents approve jobs, send them back with a kind note, add/edit/remove tasks, and set monetary rewards in pennies.
 - Approved extra jobs add to the weekly pot. Pending jobs never count as earned money.
@@ -36,7 +36,7 @@ Direct demo links: [parent dashboard](https://little-helpers-family-quest.plainp
 
 1. In Supabase **Authentication → URL Configuration**, set the Site URL to the deployed app origin and allow that origin as a redirect URL. This lets account-confirmation emails return to the correct app. Add the Netlify origin too when you move hosting.
 2. Open the live app and choose **I’m new — set up my family**. Enter your email, create and confirm a new Little Helpers password, then choose **Create parent account**. Follow the email-confirmation screen, confirm your email, then return to sign in. Returning parents choose **I already have an account**. Supabase's default confirmation-email service has a low sending limit; configure your own SMTP service if needed.
-3. In **Family settings**, set your child's display name, essential-star target, money goals, time zone, and pocket-money day.
+3. In **Family settings**, set your child's display name, money goals, time zone, and pocket-money day. The daily essential count is shown as a read-only value derived from your active tasks.
 4. In **Tasks & rewards**, set age-appropriate tasks and amounts. Essentials earn stars, not money. Paid extras should reflect effort and helping beyond everyday routines.
 5. In **Family settings → Pair a tablet**, create a link and open it on the child's tablet within ten minutes. Links work once. Paired devices last thirty days; you can revoke them at any time.
 6. On a parent's device, review jobs and record the weekly payment. Use **Lock & child view** before handing a signed-in parent device to your child.
@@ -88,7 +88,7 @@ npm run build
 
 Serve `dist/` with any static server and append `?demo=1` for the browser-local sample. For the real Netlify API locally, use Netlify Dev and set variables from `.env.example` in an ignored `.env` file. Never commit it.
 
-The tests verify the threshold, parent-only actions, approval values, retries, duplicate daily/weekly claims, payout timing and idempotence, week/time-zone boundaries, historical records, API authorization, optimistic concurrency, product metadata extraction, retailer/redirect validation, child goal permissions and the sample-toy save flow, parent invitation/join permissions, shared-family access, removal and the invited-account onboarding flow.
+The tests verify the daily all-essentials gate, automatic target changes, parent-only actions, approval values, retries, duplicate daily/weekly claims, payout timing and idempotence, day/week/time-zone boundaries, historical records, API authorization, optimistic concurrency, product metadata extraction, retailer/redirect validation, child goal permissions and the sample-toy save flow, parent invitation/join permissions, shared-family access, removal and the invited-account onboarding flow.
 
 ## Architecture and access
 
@@ -105,11 +105,13 @@ The Supabase security advisor flags disabled [leaked-password protection](https:
 ## Weekly rules
 
 - Weeks always run Monday–Sunday in the family's selected time zone.
-- The star threshold resets each Monday; old records and unpaid weeks remain available.
+- Essentials reset each day at midnight in the family's time zone. Every currently active essential must be completed and approved for that date before paid jobs unlock. Yesterday's approvals and duplicate stars never count toward today's requirement.
+- The daily requirement automatically matches the active essential tasks. Adding an essential can relock paid jobs until it is approved; removing/archiving one reduces the requirement. With zero essentials, paid jobs are available immediately.
+- Essentials always repeat daily, including older tasks saved with a weekly frequency. Paid jobs retain their daily or weekly repetition. Historical records, already-approved earnings and unpaid weeks remain available; there is no bulk daily deletion or reset job.
 - Current-week payouts are allowed on the configured payout day. Previous unpaid weeks can be paid later.
 - Clear all pending reviews for a week before paying it. Each week can be paid once.
 - A payout closes paid extra jobs for that week. Essentials remain available.
-- The weekly money goal motivates; it is not a cap. Changing a target does not remove approved earnings.
+- The weekly money goal motivates; it is not a cap. Changing essentials does not remove approved earnings. A paid claim validly submitted on an earlier day can still be reviewed later.
 - Brushing teeth is represented as one daily task covering morning and bedtime. Use two tasks if you prefer separate checks.
 - Savings progress is a record of allowance earned, not a bank balance. There is no withdrawal/spending tracker in this version.
 

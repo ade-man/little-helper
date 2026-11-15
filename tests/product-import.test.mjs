@@ -32,7 +32,7 @@ test('Does not forward family credentials to shops, follows supported redirects,
 });
 test('Child can set only the savings target and keeps earnings and reward rules',()=>{
  const s=blankState();const next=applyAction(s,'setGoal',{name:'My building set',price:1999,image:'https://images.example.com/toy.jpg',url,description:'A colourful toy',threshold:0},'child');
- assert.equal(next.settings.savingGoal,1999);assert.equal(next.settings.goalName,'My building set');assert.equal(next.goal.image,'https://images.example.com/toy.jpg');assert.deepEqual(next.tasks,s.tasks);assert.deepEqual(next.completions,s.completions);assert.equal(next.settings.threshold,8);
+ assert.equal(next.settings.savingGoal,1999);assert.equal(next.settings.goalName,'My building set');assert.equal(next.goal.image,'https://images.example.com/toy.jpg');assert.deepEqual(next.tasks,s.tasks);assert.deepEqual(next.completions,s.completions);assert.equal(next.settings.threshold,undefined);assert.equal(next.tasks.filter(t=>t.active&&t.essential).length,4);
 });
 test('Saving goal rejects invalid prices and executable image/product links',()=>{
  const s=blankState();const base={name:'My toy',price:2000};

@@ -14,25 +14,15 @@ test('Demo UI follows child submission → parent review → approved money',asy
  const interval=globalThis.setInterval,timeout=globalThis.setTimeout;globalThis.setInterval=()=>0;globalThis.setTimeout=()=>0;
  try{
    await import('../dist/app.mjs');await Promise.resolve();
-   assert.match(app.innerHTML,/My everyday essentials/);assert.match(app.innerHTML,/Unlock with stars/);
+   assert.match(app.innerHTML,/My everyday essentials/);assert.match(app.innerHTML,/Essentials first/);
    const click=async(action,extra={})=>handlers.click({preventDefault(){},target:{closest(){return {dataset:{action,...extra}};}}});
    await click('parent');assert.match(app.innerHTML,/Review completed tasks/);assert.match(app.innerHTML,/data-area="parent"/);assert.match(app.innerHTML,/Parent administration/);assert.doesNotMatch(app.innerHTML,/My adventure|My week|My money/);
    await click('admin-tab',{tab:'tasks'});assert.match(app.innerHTML,/Add task/);assert.match(app.innerHTML,/data-action="edit-task"/);assert.doesNotMatch(app.innerHTML,/I did it!/);
-   await click('admin-tab',{tab:'settings'});assert.match(app.innerHTML,/id="settings-form"/);
+   await click('admin-tab',{tab:'settings'});assert.match(app.innerHTML,/id="settings-form"/);assert.match(app.innerHTML,/4 essential tasks/);assert.doesNotMatch(app.innerHTML,/name="threshold"/);
    await click('admin-tab',{tab:'payouts'});assert.match(app.innerHTML,/Payments & history/);
    await click('admin-tab',{tab:'review'});
    await click('approve',{id:'example-review'});
    await click('child-view');assert.match(app.innerHTML,/My adventure/);assert.doesNotMatch(app.innerHTML,/data-area="parent"|Parent administration|Approve<\/button>/);
-   const s=JSON.parse(store.get('little-helpers-demo-v1'));
-   // The seed is deliberately one approved star short on most days. On
-   // Monday/Tuesday make up the essential count through real parent actions.
-   if(!app.innerHTML.includes('Your adventure is unlocked')){
-     await click('parent');await click('admin-tab',{tab:'settings'});
-     const form={id:'settings-form',querySelector:()=>({disabled:false})};
-     const old=globalThis.FormData;globalThis.FormData=class{constructor(){this.entries=()=>Object.entries({...s.settings,threshold:1,weeklyGoal:5,savingGoal:10})[Symbol.iterator]();}[Symbol.iterator](){return this.entries();}};
-     await handlers.submit({preventDefault(){},target:form});globalThis.FormData=old;
-     await click('child-view');
-   }
    assert.match(app.innerHTML,/Your adventure is unlocked/);
    await click('submit',{id:'table'});assert.equal(modal.open,true);assert.match(modal.innerHTML,/will join your pot when it’s approved/);
    await click('close');await click('parent');assert.match(app.innerHTML,/Extra helping · £0.25/);
