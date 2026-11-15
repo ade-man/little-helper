@@ -10,6 +10,7 @@ A tablet-friendly pocket-money adventure for a child, with a separate parent das
 - Parents approve jobs, send them back with a kind note, add/edit/remove tasks, and set monetary rewards in pennies.
 - Approved extra jobs add to the weekly pot. Pending jobs never count as earned money.
 - Weekly progress, a savings goal, spoken task descriptions, and celebrations encourage helping as part of the family team.
+- Read-aloud defaults to a gentle pace and softer volume, preferring an available natural/enhanced British English voice. Tap **Voice** on the child's adventure or open **Family settings → Read-aloud voice** to preview and choose a voice, pace and volume. Preferences are saved on that device; choose on the daughter's tablet to affect what she hears. Voices vary by browser/device, and more English voices may be available in the tablet's accessibility/speech settings. No family data or reward rules change when choosing a voice.
 - In **My money → Choose my dream toy**, children paste a product link to import its name, picture, description and GBP price, check an editable preview, then save it as their target. The saved price is a snapshot, not a live quote. The demo offers an illustrated example toy.
 - Payouts are a record of money handed over by a parent. There are no bank connections or transfers.
 - Secure parent login, one-time child-tablet pairing links, device revocation, and cross-device updates every 30 seconds.
