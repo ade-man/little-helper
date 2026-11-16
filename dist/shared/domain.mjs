@@ -7,17 +7,24 @@ export function weekOf(date) {
   d.setUTCDate(d.getUTCDate()-day); return d.toISOString().slice(0,10);
 }
 export function addDays(date,n) {const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+export function rewardIsReleased(c){return !c.essential&&c.status==='approved'&&c.rewardReleased!==false;}
+export function moneyLedger(s){
+  const map=new Map();const entry=week=>{if(!map.has(week))map.set(week,{week,earned:0,gifts:0,paid:0,held:0,waiting:0,remaining:0});return map.get(week);};
+  for(const c of s.completions){if(c.essential)continue;const row=entry(weekOf(c.date));if(rewardIsReleased(c))row.earned+=c.value;else if(c.status==='approved')row.held+=c.value;else if(c.status==='pending')row.waiting+=c.value;}
+  for(const c of s.credits||[]){const row=entry(weekOf(c.date));row.earned+=c.amount;row.gifts+=c.amount;if(c.received)row.paid+=c.amount;}
+  for(const p of s.payouts)entry(p.week).paid+=p.amount;
+  const weeks=[...map.values()].sort((a,b)=>a.week.localeCompare(b.week));for(const row of weeks)row.remaining=Math.max(0,row.earned-row.paid);
+  const sum=key=>weeks.reduce((n,w)=>n+w[key],0);
+  return {weeks,totalEarned:sum('earned'),totalPaid:sum('paid'),unpaid:sum('remaining'),totalHeld:sum('held'),totalWaiting:sum('waiting')};
+}
 export function stats(s,date) {
   const week=weekOf(date); const c=s.completions.filter(c=>weekOf(c.date)===week);
   const stars=c.filter(c=>c.essential&&c.status==='approved').length;
-  const approved=c.filter(c=>!c.essential&&c.status==='approved').reduce((n,c)=>n+c.value,0);
-  const waiting=c.filter(c=>!c.essential&&c.status==='pending').reduce((n,c)=>n+c.value,0);
-  const paid=s.payouts.find(p=>p.week===week)?.amount||0;
-  const saved=s.payouts.reduce((n,p)=>n+p.amount,0);
+  const ledger=moneyLedger(s),row=ledger.weeks.find(w=>w.week===week)||{earned:0,paid:0,held:0,waiting:0,remaining:0};
   const essentials=s.tasks.filter(t=>t.active&&t.essential);
   const approvedToday=new Set(s.completions.filter(c=>c.date===date&&c.status==='approved').map(c=>c.taskId));
   const essentialsTotal=essentials.length,essentialsDone=essentials.filter(t=>approvedToday.has(t.id)).length;
-  return {week,stars,essentialsTotal,essentialsDone,unlocked:essentialsDone===essentialsTotal,approved,waiting,paid,saved,remaining:Math.max(0,approved-paid)};
+  return {week,stars,essentialsTotal,essentialsDone,unlocked:essentialsDone===essentialsTotal,approved:row.earned,waiting:row.waiting,held:row.held,paid:row.paid,saved:ledger.totalPaid,remaining:row.remaining,unpaid:ledger.unpaid,previousUnpaid:ledger.unpaid-row.remaining,totalHeld:ledger.totalHeld,totalWaiting:ledger.totalWaiting,totalEarned:ledger.totalEarned};
 }
 export function taskStatus(s,t,date) {
   return s.completions.find(c=>c.taskId===t.id&&(!t.essential&&t.frequency==='weekly'?weekOf(c.date)===weekOf(date):c.date===date));
@@ -34,7 +41,7 @@ export function blankState(date=localDate()) {
     {id:'socks',title:'Match the socks',detail:'Find a matching friend for each sock.',icon:'sock',category:'Extra mile',essential:false,value:75,frequency:'weekly',active:true},
     {id:'towels',title:'Fold the towels',detail:'Make a neat, cosy stack together.',icon:'towel',category:'Extra mile',essential:false,value:75,frequency:'weekly',active:true},
     {id:'car',title:'Help wash the car',detail:'A big helping hand for a big job.',icon:'car',category:'Extra mile',essential:false,value:150,frequency:'weekly',active:true}
-  ],completions:[],payouts:[],created:date};
+  ],completions:[],payouts:[],credits:[],created:date};
 }
 export function demoState(date=localDate()) {
   const s=blankState(date); const week=weekOf(date);
@@ -46,6 +53,12 @@ export function demoState(date=localDate()) {
   return s;
 }
 function requireParent(role) {if(role!=='parent') throw new Error('A grown-up needs to do this.');}
+function validDate(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(new Date(value+'T12:00:00Z').getTime())&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value;}
+function reference(value,fallback){if(value===undefined)return fallback;if(typeof value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))throw new Error('This entry reference is not valid. Please reopen the form.');return value;}
+function releaseEligibleRewards(s,date){
+  const approvedByDate=new Map();for(const c of s.completions)if(c.status==='approved'){if(!approvedByDate.has(c.date))approvedByDate.set(c.date,new Set());approvedByDate.get(c.date).add(c.taskId);}
+  for(const c of s.completions)if(!c.essential&&c.status==='approved'&&c.rewardReleased===false&&Array.isArray(c.requiredEssentialIds)&&c.requiredEssentialIds.every(id=>approvedByDate.get(c.date)?.has(id))){c.rewardReleased=true;c.releasedOn=date;c.releaseKind='essentials';}
+}
 function goalUrl(value) {
   if(!value)return '';
   try{const u=new URL(String(value));if(u.protocol==='https:'&&!u.username&&!u.password&&u.href.length<=2048&&!/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[)/i.test(u.hostname)&&! /\.(local|internal|localhost)$/.test(u.hostname))return u.href;}catch{}
@@ -56,18 +69,30 @@ export function applyAction(state,action,data={},role='child',date=localDate(),i
   if(action==='submit') {
     const t=s.tasks.find(t=>t.id===data.taskId&&t.active);
     if(!t) throw new Error('This job is no longer available.');
-    if(s.payouts.some(p=>p.week===current.week)&&!t.essential) throw new Error('This week has been paid. More adventures start on Monday!');
-    if(!t.essential&&!current.unlocked) throw new Error('Finish all of today’s essential tasks and have them approved to unlock extra jobs.');
     const old=taskStatus(s,t,date);
     if(old&&old.status!=='retry') throw new Error('You have already sent this job for review.');
-    if(old) {old.status='pending';old.note='';old.value=t.essential?0:t.value;}
-    else s.completions.push({id,taskId:t.id,title:t.title,icon:t.icon,date,essential:t.essential,value:t.essential?0:t.value,status:'pending',note:''});
+    const requirements=s.tasks.filter(t=>t.active&&t.essential).map(t=>t.id);
+    if(old) {old.status='pending';old.note='';old.value=t.essential?0:t.value;old.date=date;if(!t.essential){old.rewardReleased=false;old.requiredEssentialIds=requirements;}}
+    else s.completions.push({id,taskId:t.id,title:t.title,icon:t.icon,date,essential:t.essential,value:t.essential?0:t.value,status:'pending',note:'',...(!t.essential?{rewardReleased:false,requiredEssentialIds:requirements}:{})});
   } else if(action==='review') {
     requireParent(role); const c=s.completions.find(c=>c.id===data.id);
     if(!c||c.status!=='pending') throw new Error('This job has already been reviewed.');
     if(!['approved','retry'].includes(data.status)) throw new Error('Choose approve or try again.');
-    if(!c.essential&&s.payouts.some(p=>p.week===weekOf(c.date))) throw new Error('This week is already closed.');
     c.status=data.status;c.note=String(data.note||'').trim().slice(0,180);
+  } else if(action==='releaseReward') {
+    requireParent(role);const c=s.completions.find(c=>c.id===data.id);
+    if(!c||c.essential||c.status!=='approved')throw new Error('Approve the completed paid job before releasing its reward.');
+    if(rewardIsReleased(c))return s;
+    c.rewardReleased=true;c.releasedOn=date;c.releaseKind='parent';c.releaseNote=String(data.note||'Parent exception').trim().slice(0,180);
+  } else if(action==='addMoney') {
+    requireParent(role);const amount=Number(data.amount),title=String(data.title||'').trim(),on=data.date||date,entryId=reference(data.entryId,id);
+    if(!Number.isSafeInteger(amount)||amount<1||amount>100000)throw new Error('Enter an amount between £0.01 and £1,000.');
+    if(!title||title.length>100)throw new Error('Add a short description, such as Gift from Grandma.');
+    if(!validDate(on)||on>date)throw new Error('Choose today or an earlier date.');
+    if(data.received!==undefined&&typeof data.received!=='boolean')throw new Error('Choose whether the money has already been received.');
+    const credit={id:entryId,amount,title,date:on,received:data.received===true};s.credits=s.credits||[];
+    const old=s.credits.find(c=>c.id===entryId);if(old){if(old.amount!==credit.amount||old.title!==credit.title||old.date!==credit.date||old.received!==credit.received)throw new Error('This entry is already recorded. Refresh before adding another.');return s;}
+    s.credits.push(credit);
   } else if(action==='saveTask') {
     requireParent(role);
     const title=String(data.title||'').trim(); const value=Number(data.value);
@@ -98,14 +123,18 @@ export function applyAction(state,action,data={},role='child',date=localDate(),i
     s.settings=n;
   } else if(action==='payout') {
     requireParent(role);
-    const week=data.week||current.week;
-    if(week!==weekOf(week)||week>current.week)throw new Error('Choose an existing week.');
-    const st=stats(s,week);
-    if(week===current.week&&new Date(date+'T12:00:00Z').getUTCDay()!==s.settings.payday)throw new Error('This week can be paid on your chosen pocket-money day.');
-    if(s.payouts.some(p=>p.week===week))throw new Error('This week has already been paid.');
-    if(s.completions.some(c=>weekOf(c.date)===week&&c.status==='pending'))throw new Error('Review the waiting jobs for this week first.');
-    if(st.approved<=0)throw new Error('There is no approved pocket money to pay yet.');
-    s.payouts.push({id,week,amount:st.approved,date});
+    if(data.week&&(!validDate(data.week)||data.week!==weekOf(data.week)||data.week>current.week))throw new Error('Choose an existing week.');
+    const ledger=moneyLedger(s),rows=ledger.weeks.filter(w=>!data.week||w.week===data.week),available=rows.reduce((n,w)=>n+w.remaining,0);
+    const paymentId=reference(data.paymentId,id),amount=Number(data.amount??available),note=String(data.note||'Pocket money given').trim().slice(0,180);
+    const existing=s.payouts.filter(p=>p.paymentId===paymentId);if(existing.length){if(existing.reduce((n,p)=>n+p.amount,0)!==amount)throw new Error('This payment has already been recorded.');return s;}
+    if(!Number.isSafeInteger(amount)||amount<1)throw new Error('There is no unpaid money ready to be paid.');
+    if(amount>available)throw new Error('That exceeds the unpaid money ready to be paid. Waiting rewards are not included.');
+    let left=amount;for(const row of rows){const paid=Math.min(left,row.remaining);if(paid>0)s.payouts.push({id:paymentId+':'+row.week,paymentId,week:row.week,amount:paid,date,note});left-=paid;if(!left)break;}
   } else throw new Error('Unknown action.');
+  if(action==='saveTask'||action==='archiveTask'){
+    const requirements=s.tasks.filter(t=>t.active&&t.essential).map(t=>t.id);
+    for(const c of s.completions)if(!c.essential&&c.date===date&&c.rewardReleased===false)c.requiredEssentialIds=requirements.slice();
+  }
+  releaseEligibleRewards(s,date);
   return s;
 }

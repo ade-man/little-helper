@@ -5,14 +5,15 @@ A tablet-friendly pocket-money adventure for a child, with a separate parent das
 ## What works
 
 - A child ticks off essential routines and homework, then sends them for parent approval.
-- Each approved essential earns a star. Paid jobs unlock only after every active essential has been approved **that day**. The requirement is always the number of active essentials; there is no manually configured threshold.
+- Each approved essential earns a star. Children can record paid jobs at any time. Approved rewards wait until all essentials for the job’s original day are approved, or a parent chooses **Release reward anyway**. The daily requirement always matches the active essentials; there is no manually configured threshold.
 - Daily tasks can be claimed once per calendar day; weekly tasks once per Monday–Sunday week.
 - Parents approve jobs, send them back with a kind note, add/edit/remove tasks, and set monetary rewards in pennies.
-- Approved extra jobs add to the weekly pot. Pending jobs never count as earned money.
+- Released rewards add to the weekly pot and the prominent **all unpaid money** total, which carries across weeks. Pending jobs and rewards waiting for essentials appear separately.
 - Weekly progress, a savings goal, spoken task descriptions, and celebrations encourage helping as part of the family team.
 - Read-aloud defaults to a gentle pace and softer volume, preferring an available natural/enhanced British English voice. Tap **Voice** on the child's adventure or open **Family settings → Read-aloud voice** to preview and choose a voice, pace and volume. Preferences are saved on that device; choose on the daughter's tablet to affect what she hears. Voices vary by browser/device, and more English voices may be available in the tablet's accessibility/speech settings. No family data or reward rules change when choosing a voice.
 - In **My money → Choose my dream toy**, children paste a product link to import its name, picture, description and GBP price, check an editable preview, then save it as their target. The saved price is a snapshot, not a live quote. The demo offers an illustrated example toy.
-- Payouts are a record of money handed over by a parent. There are no bank connections or transfers.
+- Parents can add gifts and one-off rewards in **Payments → Add gift / reward**, including a description, date, amount and whether it has already been received. Received gifts count in the history without adding to money owed.
+- Payouts support partial payments across weeks, settling older amounts first, and are a record of money handed over by a parent. There are no bank connections or transfers.
 - Secure parent login, one-time child-tablet pairing links, device revocation, and cross-device updates every 30 seconds.
 
 ## Current hosted setup
@@ -88,7 +89,7 @@ npm run build
 
 Serve `dist/` with any static server and append `?demo=1` for the browser-local sample. For the real Netlify API locally, use Netlify Dev and set variables from `.env.example` in an ignored `.env` file. Never commit it.
 
-The tests verify the daily all-essentials gate, automatic target changes, parent-only actions, approval values, retries, duplicate daily/weekly claims, payout timing and idempotence, day/week/time-zone boundaries, historical records, API authorization, optimistic concurrency, product metadata extraction, retailer/redirect validation, child goal permissions and the sample-toy save flow, parent invitation/join permissions, shared-family access, removal and the invited-account onboarding flow.
+The tests verify early claims, original-day reward release, parent exceptions, automatic essential target changes, parent-only money actions, gifts already received, unpaid rollover, partial and supplemental payments, financial idempotency and validation, approval values, retries, duplicate daily/weekly claims, day/week/time-zone boundaries, historical records, API authorization, optimistic concurrency, product metadata extraction, retailer/redirect validation, child goal permissions and the sample-toy save flow, parent invitation/join permissions, shared-family access, removal and the invited-account onboarding flow.
 
 ## Architecture and access
 
@@ -105,13 +106,14 @@ The Supabase security advisor flags disabled [leaked-password protection](https:
 ## Weekly rules
 
 - Weeks always run Monday–Sunday in the family's selected time zone.
-- Essentials reset each day at midnight in the family's time zone. Every currently active essential must be completed and approved for that date before paid jobs unlock. Yesterday's approvals and duplicate stars never count toward today's requirement.
-- The daily requirement automatically matches the active essential tasks. Adding an essential can relock paid jobs until it is approved; removing/archiving one reduces the requirement. With zero essentials, paid jobs are available immediately.
-- Essentials always repeat daily, including older tasks saved with a weekly frequency. Paid jobs retain their daily or weekly repetition. Historical records, already-approved earnings and unpaid weeks remain available; there is no bulk daily deletion or reset job.
-- Current-week payouts are allowed on the configured payout day. Previous unpaid weeks can be paid later.
-- Clear all pending reviews for a week before paying it. Each week can be paid once.
-- A payout closes paid extra jobs for that week. Essentials remain available.
-- The weekly money goal motivates; it is not a cap. Changing essentials does not remove approved earnings. A paid claim validly submitted on an earlier day can still be reviewed later.
+- Essentials reset each day at midnight in the family's time zone. Jobs can be recorded before essentials are finished. A new paid job becomes earned only when the parent approves it and every required essential for its original date is approved. Yesterday's essentials cannot unlock today's rewards.
+- Requirements follow active essentials when a claim is submitted. Editing essentials refreshes unreleased claims for the current day; earlier dates retain their original requirements. Released and legacy approved earnings are preserved.
+- **Review jobs → Rewards waiting for essentials → Release reward anyway** allows an explicit parent exception, including for past dates.
+- Essentials always repeat daily, including older tasks saved with a weekly frequency. Paid jobs retain their daily or weekly repetition. Daily/weekly boundaries never delete history or unpaid money.
+- The child's adventure, My money and parent Payments show all released money still owed, across every week. Amounts awaiting review or essentials are shown separately and cannot be paid yet.
+- Gifts and bonuses bypass essentials. Mark gifts **already received** when the money has already been handed over, to avoid adding an outstanding debt.
+- Record payments after handing over money, on any day. The configured payday is a reminder. Partial payments settle older unpaid weeks first; a specific week can also be selected. Later approved earnings can be paid separately, and pending jobs do not prevent paying money already earned.
+- The weekly goal motivates; it is not a cap. There is no bank connection or transfer.
 - Brushing teeth is represented as one daily task covering morning and bedtime. Use two tasks if you prefer separate checks.
 - Savings progress is a record of allowance earned, not a bank balance. There is no withdrawal/spending tracker in this version.
 

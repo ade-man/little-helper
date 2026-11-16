@@ -1,30 +1,31 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {blankState,demoState,applyAction,stats,taskStatus,weekOf,localDate} from '../shared/domain.mjs';
+import {blankState,demoState,applyAction,stats,taskStatus,weekOf,localDate,moneyLedger,rewardIsReleased} from '../shared/domain.mjs';
 const date='2026-11-14',nextDay='2026-11-15';
 const act=(s,a,d={},r='parent',day=date)=>applyAction(s,a,d,r,day);
 function finishEssentials(s,day=date){for(const t of s.tasks.filter(t=>t.active&&t.essential)){if(taskStatus(s,t,day)?.status==='approved')continue;s=act(s,'submit',{taskId:t.id},'child',day);s=act(s,'review',{id:taskStatus(s,t,day).id,status:'approved'},'parent',day);}return s;}
 function ready(){return finishEssentials(blankState(date));}
 function earn(s,id='table',day=date){s=act(s,'submit',{taskId:id},'child',day);return act(s,'review',{id:taskStatus(s,s.tasks.find(t=>t.id===id),day).id,status:'approved'},'parent',day);}
 
-test('Every active essential must be approved today, regardless of an old weekly threshold',()=>{
- let s=blankState(date);s.settings.threshold=1;assert.equal(stats(s,date).essentialsTotal,4);
- assert.throws(()=>act(s,'submit',{taskId:'table'},'child'),/today’s essential/);
+test('Jobs can be claimed early but all daily essentials and parent approval are required to earn',()=>{
+ let s=blankState(date);s.settings.threshold=1;
+ s=act(s,'submit',{taskId:'table'},'child');const paid=s.completions[0];
+ assert.equal(stats(s,date).waiting,25);assert.equal(stats(s,date).unpaid,0);
+ assert.throws(()=>act(s,'review',{id:paid.id,status:'approved'},'child'),/grown-up/);
+ s=act(s,'review',{id:paid.id,status:'approved'});
+ assert.equal(stats(s,date).held,25);assert.equal(stats(s,date).approved,0);
  for(const t of s.tasks.filter(t=>t.essential))s=act(s,'submit',{taskId:t.id},'child');
- assert.equal(stats(s,date).essentialsDone,0);assert.equal(stats(s,date).unlocked,false);
- assert.throws(()=>act(s,'review',{id:s.completions[0].id,status:'approved'},'child'),/grown-up/);
- for(const c of s.completions.slice(0,3))s=act(s,'review',{id:c.id,status:'approved'});
- assert.equal(stats(s,date).essentialsDone,3);assert.equal(stats(s,date).unlocked,false);
- assert.throws(()=>act(s,'submit',{taskId:'table'},'child'),/today’s essential/);
- s=act(s,'review',{id:s.completions[3].id,status:'approved'});assert.equal(stats(s,date).unlocked,true);
- s=act(s,'submit',{taskId:'table'},'child');assert.equal(stats(s,date).approved,0);assert.equal(stats(s,date).waiting,25);
- s=act(s,'review',{id:s.completions.at(-1).id,status:'approved'});assert.equal(stats(s,date).approved,25);
+ for(const c of s.completions.filter(c=>c.essential).slice(0,3))s=act(s,'review',{id:c.id,status:'approved'});
+ assert.equal(stats(s,date).essentialsDone,3);assert.equal(stats(s,date).unlocked,false);assert.equal(stats(s,date).held,25);
+ s=act(s,'review',{id:s.completions.at(-1).id,status:'approved'});
+ assert.equal(stats(s,date).unlocked,true);assert.equal(stats(s,date).held,0);assert.equal(stats(s,date).unpaid,25);
+ assert.equal(s.completions[0].releaseKind,'essentials');
 });
-test('Paid jobs lock again tomorrow while approved weekly earnings and history stay intact',()=>{
+test('Tomorrow starts fresh essentials without removing earned money or preventing early jobs',()=>{
  let s=earn(ready());assert.equal(stats(s,date).unlocked,true);
- const tomorrow=stats(s,nextDay);assert.equal(tomorrow.essentialsTotal,4);assert.equal(tomorrow.essentialsDone,0);assert.equal(tomorrow.unlocked,false);assert.equal(tomorrow.approved,25);assert.equal(tomorrow.stars,4);
- assert.throws(()=>act(s,'submit',{taskId:'toys'},'child',nextDay),/today’s essential/);
- s=finishEssentials(s,nextDay);assert.equal(stats(s,nextDay).unlocked,true);assert.equal(stats(s,nextDay).stars,8);assert.equal(stats(s,nextDay).approved,25);
+ const tomorrow=stats(s,nextDay);assert.equal(tomorrow.essentialsDone,0);assert.equal(tomorrow.unlocked,false);assert.equal(tomorrow.approved,25);
+ s=earn(s,'toys',nextDay);assert.equal(stats(s,nextDay).held,50);assert.equal(stats(s,nextDay).unpaid,25);
+ s=finishEssentials(s,nextDay);assert.equal(stats(s,nextDay).unlocked,true);assert.equal(stats(s,nextDay).stars,8);assert.equal(stats(s,nextDay).unpaid,75);
 });
 test('Duplicate historical or same-task stars cannot substitute for another essential',()=>{
  let s=blankState(date);s.settings.threshold=0;s=act(s,'submit',{taskId:'reading'},'child');s=act(s,'review',{id:s.completions[0].id,status:'approved'});
@@ -63,13 +64,14 @@ test('A valid earlier paid claim can be reviewed tomorrow without unlocking tomo
  assert.equal(stats(s,nextDay).approved,25);assert.equal(stats(s,nextDay).unlocked,false);
 });
 test('Children cannot edit tasks, settings, archive tasks or pay themselves',()=>{
- for(const a of ['saveTask','archiveTask','settings','payout'])assert.throws(()=>act(ready(),a,{},'child'),/grown-up/);
+ for(const a of ['saveTask','archiveTask','settings','payout','addMoney','releaseReward'])assert.throws(()=>act(ready(),a,{},'child'),/grown-up/);
 });
-test('Payouts still require the right day, cleared reviews, and cannot be repeated',()=>{
- let s=ready();s=act(s,'submit',{taskId:'table'},'child');assert.throws(()=>act(s,'payout',{},'parent',nextDay),/Review/);
- s=act(s,'review',{id:s.completions.at(-1).id,status:'approved'});assert.throws(()=>act(s,'payout'),/chosen pocket-money day/);
- s=act(s,'payout',{},'parent',nextDay);assert.equal(stats(s,nextDay).paid,25);assert.throws(()=>act(s,'payout',{},'parent',nextDay),/already been paid/);
- assert.throws(()=>act(s,'submit',{taskId:'toys'},'child',nextDay),/has been paid/);assert.equal(stats(s,'2026-11-16').stars,0);assert.equal(stats(s,'2026-11-16').approved,0);assert.equal(stats(s,'2026-11-16').saved,25);
+test('Money actually given can be recorded any day, with later earnings paid separately',()=>{
+ let s=ready();s=act(s,'submit',{taskId:'table'},'child');assert.throws(()=>act(s,'payout'),/no unpaid money/);
+ s=act(s,'review',{id:s.completions.at(-1).id,status:'approved'});s=act(s,'payout');
+ assert.equal(stats(s,date).paid,25);assert.throws(()=>act(s,'payout'),/no unpaid money/);
+ s=earn(s,'toys');assert.equal(stats(s,date).unpaid,50);s=act(s,'payout');
+ assert.equal(stats(s,date).paid,75);assert.equal(stats(s,'2026-11-16').saved,75);assert.equal(stats(s,'2026-11-16').unpaid,0);
 });
 test('Essentials remain usable and reviewable on a new day after a weekly payout',()=>{
  let s=earn(ready());s.settings.payday=6;s=act(s,'payout');s=act(s,'submit',{taskId:'teeth'},'child',nextDay);
