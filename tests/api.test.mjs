@@ -36,3 +36,14 @@ test('Live API records early work using the server date and holds its reward unt
  }
  assert.equal(m.getState().completions.find(c=>c.id===claim.id).rewardReleased,true);
 });
+
+test('Paired children can add and remove dream toys without touching financial records',async()=>{
+ const m=mockDb(),h=createHandler(env,m.fetcher),before=structuredClone(m.getState());
+ for(let n=1;n<=2;n++){
+  const r=await h(post('setGoal',{mode:'add',goalId:`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,name:`Dream ${n}`,price:n*200},child));assert.equal(r.status,200);
+ }
+ assert.equal(m.getState().goals.length,2);
+ const removed=await h(post('removeGoal',{goalId:m.getState().goals[0].id,amount:99999},child));assert.equal(removed.status,200);assert.equal(m.getState().goals.length,1);
+ for(const key of ['tasks','completions','payouts','credits'])assert.deepEqual(m.getState()[key],before[key]);
+ assert.equal((await h(post('addMoney',{title:'My reward',amount:99999},child))).status,403);
+});

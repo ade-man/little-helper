@@ -17,6 +17,19 @@ export function moneyLedger(s){
   const sum=key=>weeks.reduce((n,w)=>n+w[key],0);
   return {weeks,totalEarned:sum('earned'),totalPaid:sum('paid'),unpaid:sum('remaining'),totalHeld:sum('held'),totalWaiting:sum('waiting')};
 }
+export function dreamToys(s){
+  if(Array.isArray(s.goals))return s.goals;
+  if(s.goal)return [{...s.goal,id:s.goal.id||'legacy-goal'}];
+  return s.settings?.goalName?[{id:'legacy-goal',name:s.settings.goalName,price:s.settings.savingGoal,image:'',url:'',description:''}]:[];
+}
+export function dreamProgress(s,toy){
+  const pot=moneyLedger(s).totalEarned;
+  return {pot,needed:Math.max(0,toy.price-pot),left:Math.max(0,pot-toy.price),percent:Math.min(100,Math.floor(pot/toy.price*100)),affordable:pot>=toy.price};
+}
+function syncFirstDream(s){
+  s.goal=s.goals[0]||null;
+  if(s.goal){s.settings.goalName=s.goal.name;s.settings.savingGoal=s.goal.price;}
+}
 export function stats(s,date) {
   const week=weekOf(date); const c=s.completions.filter(c=>weekOf(c.date)===week);
   const stars=c.filter(c=>c.essential&&c.status==='approved').length;
@@ -41,7 +54,7 @@ export function blankState(date=localDate()) {
     {id:'socks',title:'Match the socks',detail:'Find a matching friend for each sock.',icon:'sock',category:'Extra mile',essential:false,value:75,frequency:'weekly',active:true},
     {id:'towels',title:'Fold the towels',detail:'Make a neat, cosy stack together.',icon:'towel',category:'Extra mile',essential:false,value:75,frequency:'weekly',active:true},
     {id:'car',title:'Help wash the car',detail:'A big helping hand for a big job.',icon:'car',category:'Extra mile',essential:false,value:150,frequency:'weekly',active:true}
-  ],completions:[],payouts:[],credits:[],created:date};
+  ],completions:[],payouts:[],credits:[],goals:[],created:date};
 }
 export function demoState(date=localDate()) {
   const s=blankState(date); const week=weekOf(date);
@@ -108,9 +121,18 @@ export function applyAction(state,action,data={},role='child',date=localDate(),i
     if(!name||name.length>60)throw new Error('Give your toy a short name (up to 60 letters).');
     if(!Number.isInteger(amount)||amount<1||amount>100000)throw new Error('Use a target price between £0.01 and £1,000.');
     const image=data.image==='/assets/toy-blocks.svg'?data.image:goalUrl(data.image);
-    s.goal={name,price:amount,image,url:goalUrl(data.url),description:String(data.description||'').trim().slice(0,300),updatedAt:date};
-    // This action intentionally changes only the child's savings target.
-    s.settings.goalName=name;s.settings.savingGoal=amount;
+    const goals=dreamToys(s),mode=data.mode||'legacy';
+    if(!['add','edit','legacy'].includes(mode))throw new Error('Choose a toy to add or edit.');
+    const goalId=data.goalId==='legacy-goal'?data.goalId:reference(data.goalId,mode==='legacy'?(goals[0]?.id||id):id);
+    const index=goals.findIndex(g=>g.id===goalId);
+    if(mode==='edit'&&index<0)throw new Error('This toy has been removed. Choose another dream.');
+    if(index<0&&goals.length>=20)throw new Error('Your dream shelf is full! Remove a toy before adding another.');
+    const goal={id:goalId,name,price:amount,image,url:goalUrl(data.url),description:String(data.description||'').trim().slice(0,300),updatedAt:date};
+    if(index<0)goals.push(goal);else goals[index]=goal;
+    s.goals=goals;syncFirstDream(s);
+    // Dream choices never change earned money, payments or reward rules.
+  } else if(action==='removeGoal') {
+    s.goals=dreamToys(s).filter(g=>g.id!==data.goalId);syncFirstDream(s);
   } else if(action==='settings') {
     requireParent(role);
     const n={name:String(data.name||'').trim(),weeklyGoal:Number(data.weeklyGoal),savingGoal:Number(data.savingGoal),goalName:String(data.goalName||'').trim(),payday:Number(data.payday),timeZone:data.timeZone||s.settings.timeZone};
@@ -118,9 +140,10 @@ export function applyAction(state,action,data={},role='child',date=localDate(),i
     if(![n.weeklyGoal,n.savingGoal].every(v=>Number.isInteger(v)&&v>=1&&v<=100000))throw new Error('Goals must be between £0.01 and £1,000.');
     if(!Number.isInteger(n.payday)||n.payday<0||n.payday>6)throw new Error('Choose a payout day.');
     try {localDate(new Date(),n.timeZone);}catch {throw new Error('Choose a valid time zone.');}
-    if(s.goal&&n.goalName!==s.settings.goalName)s.goal=null;
-    else if(s.goal)s.goal={...s.goal,price:n.savingGoal};
-    s.settings=n;
+    const goals=dreamToys(s);
+    if(!goals.length&&(n.goalName!==s.settings.goalName||n.savingGoal!==s.settings.savingGoal))goals.push({id,name:n.goalName,price:n.savingGoal,image:'',url:'',description:'',updatedAt:date});
+    if(goals.length){const first=goals[0],renamed=n.goalName!==first.name;goals[0]={...first,name:n.goalName,price:n.savingGoal,updatedAt:date,...(renamed?{image:'',url:'',description:''}:{})};s.goals=goals;}
+    s.settings=n;if(goals.length)syncFirstDream(s);
   } else if(action==='payout') {
     requireParent(role);
     if(data.week&&(!validDate(data.week)||data.week!==weekOf(data.week)||data.week>current.week))throw new Error('Choose an existing week.');

@@ -68,7 +68,7 @@ export function createHandler(env=process.env,fetcher=fetch){
        familyId=devices[0].family_id;role='child';
      }else throw new HttpError('Sign in or pair a tablet to continue.',401);
      if(!familyId)throw new HttpError('The family space could not be opened.',503);
-     if(role==='child'&&!['snapshot','submit','importProduct','setGoal'].includes(action))throw new HttpError('A grown-up needs to do this.',403);
+     if(role==='child'&&!['snapshot','submit','importProduct','setGoal','removeGoal'].includes(action))throw new HttpError('A grown-up needs to do this.',403);
      if(['inviteParent','revokeParentInvite','removeParent','revokeDevices'].includes(action)&&memberRole!=='owner')throw new HttpError('Only the original parent can manage family access.',403);
      if(action==='parentAccess'){
        if(role!=='parent')throw new HttpError('A grown-up needs to do this.',403);

@@ -22,3 +22,36 @@
 
 .derived-target{display:flex;align-items:center;min-height:45px;padding:12px 13px;border:1px solid #dce3d5;border-radius:10px;background:#f1f5ed;color:#42634a;font-size:15px;font-weight:700}
 .wallet-breakdown{margin:22px 0 0;border-top:1px solid #cddbc4;text-align:left}.wallet-breakdown>div{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid #d4dfcc;font-size:12px;line-height:1.5}.wallet-breakdown span{color:#65795d}.wallet-breakdown strong{white-space:nowrap}.wallet-breakdown .wallet-held{color:#a18135}.wallet-total{font:800 48px/1.2 Nunito;letter-spacing:-1.5px;margin:9px 0 12px;color:#294e43}.parent-wallet{background:#edf4ee!important;border-color:#cedfd0!important}.reward-hint{font-size:11px;line-height:1.5;color:#987947;background:#faf3df;padding:8px 9px;border-radius:8px;margin:0 0 10px}.money-card .money-note{position:static;max-width:calc(100% - 42px);line-height:1.6;margin-top:5px}.parent-wallet .panel-title{align-items:flex-start}.parent-wallet .panel-title .subtext{margin:6px 0 0}.parent-wallet .wallet-total{font-family:'DM Sans',sans-serif}.history-row>div{min-width:0}.history-row>strong{flex-shrink:0}@media(max-width:650px){.parent-wallet .panel-title{flex-direction:column;gap:12px}.wallet-total{font-size:44px}.wallet-breakdown>div{font-size:12px}.review-row>.btn{margin-left:auto}.money-card .money-note{position:static;max-width:calc(100% - 42px);font-size:11px}}
+
+/* Keep read-aloud beside the task picture and align action buttons below hints. */
+.task-card .task-top{align-items:center;gap:8px}
+.task-card .task-listen{width:48px;height:48px;min-width:48px;min-height:48px;margin:0;background:#f1ede0;color:#617b66;border:1px solid #e3e6d8;border-radius:14px}
+.task-card .task-listen .icon{width:25px;height:25px;stroke-width:1.9}
+.task-card .task-listen:hover{background:#e6ecdf}
+.extra-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.extra-grid .task-top{display:grid;grid-template-columns:40px 48px minmax(0,1fr);gap:6px;align-items:center}
+.extra-grid .task-picture{width:40px;height:44px;border-radius:12px}
+.extra-grid .reward{justify-self:end;white-space:nowrap;font-size:17px}
+.extra-grid .task-btn{margin-top:auto}
+.dream-intro{font-size:13px;color:#71826b;margin:0 0 17px}
+.goal-panel{min-width:0}
+.dream-tab-bar{display:flex;gap:8px;align-items:stretch;margin:0 -4px 20px;min-width:0}
+.dream-tabs{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;padding:4px;scroll-padding:4px;scrollbar-width:thin}
+.dream-tabs [role=tab]{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;min-height:58px;max-width:165px;padding:10px 13px;border:1px solid #e4dfeb;border-radius:13px;background:#f6f2f9;color:#786c89;text-align:left;font:800 13px Nunito}
+.dream-tabs [role=tab] span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dream-tabs [role=tab] small{font:600 12px 'DM Sans',sans-serif;color:#7b7485}
+.dream-tabs [aria-selected=true]{background:#e9dff3;border-color:#b99bcf;color:#564568;box-shadow:inset 0 -2px #b99bcf}
+.dream-add{width:48px;min-width:48px;min-height:58px;margin:4px 0;border:1px dashed #bca4cf;background:#f9f5fc;color:#78618f;border-radius:13px;display:grid;place-items:center}
+.dream-add .icon{width:26px;height:26px}
+#dream-detail{display:flex;flex-direction:column;flex:1;min-width:0;outline-offset:6px}
+.goal-panel #dream-detail .goal-total{margin-top:14px;padding-top:0}
+.dream-outcome{display:grid;grid-template-columns:27px 1fr;column-gap:9px;row-gap:4px;padding:15px;margin:17px 0 0;border-radius:13px;background:#f4f0f8;color:#78618f;text-align:left}
+.dream-outcome .icon{grid-row:1/3;width:25px;height:25px;align-self:center}
+.dream-outcome strong{font:900 17px Nunito}
+.dream-outcome span{font-size:12px;line-height:1.6}
+.dream-ready{background:#edf4e5;color:#537744}
+.dream-pot-note{margin:15px 0 17px}
+.dream-controls{margin-top:auto}
+.dream-edit-controls{display:flex;justify-content:center;gap:12px;margin-top:7px}
+.dream-edit-controls .text-link{min-height:44px;color:#717e67}
+@media(max-width:650px){.extra-grid .task-listen{width:48px;height:48px}.dream-tabs [role=tab]{min-height:62px;font-size:14px}.dream-outcome strong{font-size:18px}}

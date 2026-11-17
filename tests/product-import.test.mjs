@@ -43,5 +43,5 @@ test('Saving goal rejects invalid prices and executable image/product links',()=
 test('Parent changing a named goal clears stale product details; price edits keep the picture',()=>{
  let s=applyAction(blankState(),'setGoal',{name:'My toy',price:1999,image:'https://images.example.com/toy.jpg'},'child');
  const same=applyAction(s,'settings',{...s.settings,savingGoal:2500},'parent');assert.equal(same.goal.price,2500);assert.equal(same.goal.image,s.goal.image);
- const changed=applyAction(s,'settings',{...s.settings,goalName:'Another toy'},'parent');assert.equal(changed.goal,null);
+ const changed=applyAction(s,'settings',{...s.settings,goalName:'Another toy'},'parent');assert.equal(changed.goal.name,'Another toy');assert.equal(changed.goal.image,'');assert.equal(changed.goal.url,'');
 });

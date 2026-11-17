@@ -15,6 +15,9 @@ test('Demo UI records early work, releases rewards and records gifts and partial
  try{
    await import('../dist/app.mjs');await Promise.resolve();
    assert.match(app.innerHTML,/My everyday essentials/);assert.match(app.innerHTML,/Help now. Reward after essentials/);assert.match(app.innerHTML,/My money waiting to be paid/);
+   const extras=app.innerHTML.slice(app.innerHTML.indexOf('A little extra help'));
+   const cards=[...extras.matchAll(/<article class="task-card[\s\S]*?<\/article>/g)].map(m=>m[0]);assert.ok(cards.length>=6);
+   for(const card of cards){assert.ok(card.indexOf('task-picture')<card.indexOf('task-listen'));assert.ok(card.indexOf('task-listen')<card.indexOf('class="reward"'));assert.equal((card.match(/data-action="listen"/g)||[]).length,1);assert.doesNotMatch(card,/position:absolute/);}
    const click=async(action,extra={})=>handlers.click({preventDefault(){},target:{closest(){return {dataset:{action,...extra}};}}});
    await click('parent');assert.match(app.innerHTML,/Review completed tasks/);assert.match(app.innerHTML,/data-area="parent"/);assert.match(app.innerHTML,/Parent administration/);assert.doesNotMatch(app.innerHTML,/My adventure|My week|My money/);
    await click('admin-tab',{tab:'tasks'});assert.match(app.innerHTML,/Add task/);assert.match(app.innerHTML,/data-action="edit-task"/);assert.doesNotMatch(app.innerHTML,/I did it!/);
@@ -51,6 +54,22 @@ test('Demo UI records early work, releases rewards and records gifts and partial
    globalThis.FormData=class{[Symbol.iterator](){return Object.entries({name:'Rainbow building blocks',price:'19.99',description:'My next little dream',image:''})[Symbol.iterator]();}};
    try{await handlers.submit({preventDefault(){},target:{id:'goal-form',querySelector:()=>({disabled:false})}});}finally{globalThis.FormData=originalFormData;}
    assert.equal(modal.open,false);assert.match(app.innerHTML,/I’m saving for Rainbow building blocks/);assert.match(app.innerHTML,/toy-blocks.svg/);assert.match(app.innerHTML,/£19.99/);
+   let dreams=JSON.parse(store.get('little-helpers-demo-v1')),big=dreams.goals[0];const financial=JSON.stringify([dreams.completions,dreams.credits,dreams.payouts]);
+   await click('dream-add');await click('goal-manual');assert.doesNotMatch(modal.innerHTML,/value="Rainbow building blocks"/);
+   await form('goal-form',{name:'A tiny toy',price:'2.00',description:'A little treat',image:''});
+   dreams=JSON.parse(store.get('little-helpers-demo-v1'));const cheap=dreams.goals[1];assert.equal(dreams.goals.length,2);
+   assert.match(app.innerHTML,/role="tablist"/);assert.match(app.innerHTML,/Rainbow building…/);assert.match(app.innerHTML,/aria-label="Rainbow building blocks, £19.99"/);
+   assert.match(app.innerHTML,/I could choose this toy!/);assert.match(app.innerHTML,/I’ll have £1.25 left/);assert.match(app.innerHTML,/Each toy compares the same money/);
+   await click('dream-tab',{id:big.id});assert.match(app.innerHTML,/£16.74 more to go/);
+   handlers.keydown({key:'ArrowRight',preventDefault(){},target:{closest(){return {dataset:{id:big.id}};}}});assert.match(app.innerHTML,/I’m saving for A tiny toy/);
+   await click('dream-edit',{id:cheap.id});assert.match(modal.innerHTML,/value="A tiny toy"/);
+   await form('goal-form',{name:'A tiny toy',price:'2.50',description:'Still a little treat',image:''});
+   dreams=JSON.parse(store.get('little-helpers-demo-v1'));assert.equal(dreams.goals.length,2);assert.equal(dreams.goals[0].price,1999);assert.equal(dreams.goals[1].price,250);
+   assert.match(app.innerHTML,/I’ll have £0.75 left/);
+   await click('dream-remove',{id:cheap.id});assert.match(modal.innerHTML,/Your money stays in your pot/);await click('close');assert.equal(JSON.parse(store.get('little-helpers-demo-v1')).goals.length,2);
+   await click('dream-remove',{id:cheap.id});await click('confirm-dream-remove',{id:cheap.id});
+   dreams=JSON.parse(store.get('little-helpers-demo-v1'));assert.equal(dreams.goals.length,1);assert.equal(JSON.stringify([dreams.completions,dreams.credits,dreams.payouts]),financial);
+   await import('../dist/app.mjs?dreams-reload');await Promise.resolve();await click('nav',{view:'money'});assert.match(app.innerHTML,/Rainbow building blocks/);assert.match(app.innerHTML,/£16.74 more to go/);
    location.href='https://example.test/?demo=1&area=parent';
    await import('../dist/app.mjs?direct-parent-demo');await Promise.resolve();
    assert.match(app.innerHTML,/data-area="parent"/);assert.doesNotMatch(app.innerHTML,/My adventure|My week|My money/);
