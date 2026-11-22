@@ -112,7 +112,7 @@ export function applyAction(state,action,data={},role='child',date=localDate(),i
     if(!title||title.length>70) throw new Error('Give the job a name (up to 70 characters).');
     if(!Number.isInteger(value)||value<0||value>10000) throw new Error('Use an amount between £0 and £100.');
     if(!['daily','weekly'].includes(data.frequency)) throw new Error('Choose daily or weekly.');
-    const t={id:data.id||id,title,detail:String(data.detail||'').trim().slice(0,180),icon:['book','tooth','coat','pencil','plate','blocks','plant','sock','towel','car','broom','star'].includes(data.icon)?data.icon:'star',category:data.essential?'My essentials':'Family team',essential:!!data.essential,value:data.essential?0:value,frequency:data.essential?'daily':data.frequency,active:true};
+    const t={id:data.id||id,title,detail:String(data.detail||'').trim().slice(0,180),icon:['book','tooth','coat','pencil','plate','blocks','plant','sock','towel','car','broom','dog','star'].includes(data.icon)?data.icon:'star',category:data.essential?'My essentials':'Family team',essential:!!data.essential,value:data.essential?0:value,frequency:data.essential?'daily':data.frequency,active:true};
     const idx=s.tasks.findIndex(t=>t.id===data.id);if(idx>=0)s.tasks[idx]=t;else s.tasks.push(t);
   } else if(action==='archiveTask') {
     requireParent(role); const t=s.tasks.find(t=>t.id===data.id);if(!t)throw new Error('Job not found.');t.active=false;
