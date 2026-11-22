@@ -104,6 +104,13 @@ export function createHandler(env=process.env,fetcher=fetch){
      }
      const familyPath=`lh_families?id=eq.${familyId}`;
      const profilePath=childId?`lh_children?family_id=eq.${familyId}&id=eq.${childId}`:familyPath;
+     if(action==='deleteChild'){
+       if(memberRole!=='owner')throw new HttpError('Only the original parent can delete a child profile.',403);
+       if(!childId)throw new HttpError('Choose an additional child profile to delete.');
+       // The foreign keys remove this profile's devices and pairing links atomically.
+       await db(profilePath,'DELETE',undefined,'return=minimal');
+       return json({ok:true});
+     }
      const profileResponse=async state=>{
        const dashboard=role==='parent'&&body.dashboard===true
          ? await db('rpc/lh_parent_dashboard','POST',{p_family:familyId,p_inbox:body.inbox===true})
@@ -144,6 +151,7 @@ export function createHandler(env=process.env,fetcher=fetch){
 
      for(let attempt=0;attempt<5;attempt++){
        const rows=await db(profilePath+'&select=state,revision');const row=rows[0];
+       if(!row&&childId)return json({error:'This child profile is no longer available.',code:'CHILD_PROFILE_MISSING'},404);
        if(!row)throw new HttpError('Family space not found.',404);
        if(childId){
          if(!familySettings?.timeZone)throw new HttpError('Family settings could not be loaded.',503);

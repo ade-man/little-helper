@@ -52,7 +52,7 @@ async function request(action,data={},childId=selectedChild){
   else if(deviceToken) headers.Authorization='Device '+deviceToken;
   let res;try{res=await fetch(config.apiUrl||'/.netlify/functions/api',{method:'POST',headers,body:JSON.stringify({action,data,familyId:parentSession?.familyId,childId:parentSession?childId:undefined,dashboard,inbox:dashboard&&adminTab==='review'})});}catch{throw new Error('We couldn’t load your family data. Your password may be correct; please check your connection and try again.');}
   const body=await res.json();
-  if(!res.ok){if(body.code==='FAMILY_ACCESS'){parentSession=null;sessionStorage.removeItem('lh-parent');state=null;parentAccess=null;authMode='login';render();}throw new Error(body.error||'Could not connect. Please try again.');}
+  if(!res.ok){if(body.code==='FAMILY_ACCESS'){parentSession=null;sessionStorage.removeItem('lh-parent');state=null;parentAccess=null;authMode='login';render();}throw Object.assign(new Error(body.error||'Could not connect. Please try again.'),{code:body.code});}
   if(parentSession&&body.familyId){parentSession.familyId=body.familyId;if(body.memberRole)parentSession.memberRole=body.memberRole;sessionStorage.setItem('lh-parent',JSON.stringify(parentSession));}
   return body;
 }
@@ -162,14 +162,25 @@ function moneyHistory(){
  return events.length?events.map(e=>`<div class="history-row"><div>${icon(e.icon)} &nbsp; <strong>${esc(e.title)}</strong><br><span style="padding-left:30px">${shortDate(e.date)} · ${esc(e.label)}</span></div><strong>${money(e.amount)}</strong></div>`).join(''):'<div class="empty"><img src="/assets/star.svg" alt=""><h3>Your helping story starts here.</h3><p class="subtext">You can record a helping job now. Its reward joins your money after approval and essentials.</p></div>';
 }
 function moneyPage(){const st=stats(state,today);return `<section class="intro"><div><h1>All my little wins. ✨</h1><p class="subtext">New weeks bring new jobs. Your unpaid money stays right here.</p></div></section><div class="money-layout"><section class="big-pot"><div class="eyebrow" style="justify-content:center">All my money waiting to be paid</div>${pig()}<div class="money-number">${money(st.unpaid)}</div><div class="wallet-breakdown"><div><span>From earlier weeks</span><strong>${money(st.previousUnpaid)}</strong></div><div><span>From this week</span><strong>${money(st.remaining)}</strong></div>${st.totalHeld?`<div class="wallet-held"><span>Waiting for essentials</span><strong>${money(st.totalHeld)}</strong></div>`:''}${st.totalWaiting?`<div><span>Waiting for a grown-up check</span><strong>${money(st.totalWaiting)}</strong></div>`:''}<div><span>Already given to me</span><strong>${money(st.saved)}</strong></div></div><p class="smallprint" style="margin:16px 0 0">Waiting rewards are saved in your story. They join this total when they’re unlocked.<br>Pocket-money day is ${dayNames[state.settings.payday]}.</p></section>${goalPanel(st.totalEarned,st)}</div><section class="panel"><h2>My money story</h2><p class="subtext">Jobs, gifts and money received — all kept together, across every week.</p>${moneyHistory()}</section>`;}
+function childLabel(child){
+ const duplicates=children.filter(c=>c.name.trim().toLowerCase()===child.name.trim().toLowerCase());
+ return duplicates.length>1?`${child.name} (profile ${children.indexOf(child)+1})`:child.name;
+}
 function childOptions(selected){
- return children.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(c.name)}</option>`).join('');
+ return children.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(childLabel(c))}</option>`).join('');
 }
 function childSwitcher(){
  return children.length>1?`<label class="field profile-switcher">Managing child<select id="child-profile">${childOptions(selectedChild)}</select></label>`:'';
 }
+function canDeleteChild(){
+ return view==='parent'&&selectedChild!=='primary'&&(!config.configured||parentSession?.memberRole==='owner');
+}
 function childrenPanel(){
- return `<section class="panel"><div class="panel-title"><h2>Children</h2><button class="btn secondary" data-action="add-child">${icon('plus')} Add child</button></div><p class="subtext">${children.map(c=>esc(c.name)).join(' · ')||esc(state.settings.name)}</p></section>`;
+ const current=children.find(c=>c.id===selectedChild);
+ const count=state.completions.length;
+ return `<section class="panel"><div class="panel-title"><h2>Children</h2><button class="btn secondary" data-action="add-child">${icon('plus')} Add child</button></div>
+ <p class="subtext">${children.map(c=>esc(childLabel(c))).join(' · ')||esc(state.settings.name)}</p>
+ ${canDeleteChild()?`<div class="review-row"><div><strong>${esc(current?childLabel(current):state.settings.name)}</strong><div class="smallprint">${count} recorded ${count===1?'chore':'chores'} · ${money(stats(state,today).unpaid)} unpaid</div></div><button class="btn danger" data-action="delete-child">Delete selected profile</button></div>`:''}</section>`;
 }
 function parentPage(){const st=stats(state,today),pending=inbox??state.completions.filter(c=>c.status==='pending');return `<section class="intro"><div><h1>Parent dashboard</h1><p class="subtext">Approve completed jobs, set tasks and rewards, and manage pocket money.</p></div><button class="btn light" data-action="refresh">${icon('refresh')} Refresh</button></section>${childSwitcher()}${!config.configured?'<div class="notice">Demo parent dashboard. Approve jobs and edit tasks here, then open the child view to see how your changes appear. Demo changes are shared within this browser only.</div>':''}<div class="admin-stats"><div class="stat"><span>Waiting for your check</span><strong>${pending.length}</strong><small>A little encouragement goes a long way</small></div><div class="stat"><span>Essentials today</span><strong>${st.essentialsDone}<span style="font-size:17px;color:#9aa88f"> / ${st.essentialsTotal} ★</span></strong><small>${st.unlocked?'Approved rewards unlocked for today':'Approved rewards wait for essentials'}</small></div><div class="stat"><span>Total unpaid · all weeks</span><strong>${money(st.unpaid)}</strong><small>${money(st.totalHeld)} waiting for essentials · ${money(st.totalWaiting)} awaiting review</small></div></div>${adminTab==='review'?reviewPanel(inboxChild?pending.filter(c=>c.childId===inboxChild):pending):adminTab==='tasks'?tasksPanel():adminTab==='payouts'?payoutPanel():settingsPanel()}`;}
 function heldRewardsPanel(){const held=state.completions.filter(c=>!c.essential&&c.status==='approved'&&!rewardIsReleased(c));return held.length?`<section class="panel"><div class="panel-title"><h2>Rewards waiting for essentials</h2><span class="count">${held.length} waiting</span></div><p class="subtext">These jobs are approved. Rewards unlock when their original day’s essentials are approved. For an exception, you can release a reward now.</p><div class="review-list">${held.slice().reverse().map(c=>`<div class="review-row"><div class="review-info"><span class="task-picture tone-${esc(c.icon)}">${icon(c.icon)}</span><div><strong>${esc(c.title)}</strong><span>${shortDate(c.date)} · ${money(c.value)} waiting for essentials</span></div></div><button class="btn secondary" data-action="release-reward" data-id="${esc(c.id)}">Release reward anyway</button></div>`).join('')}</div></section>`:'';}
@@ -313,6 +324,30 @@ async function handleAction(a,el){
  if(a==='confirm-archive'){if(await mutate('archiveTask',{id:el.dataset.id})){modal.close();toast('Task removed. Previous progress is kept.');}return;}
  if(a==='payout'){const amount=el.dataset.week?stats(state,el.dataset.week).remaining:stats(state,today).unpaid;showModal(`${modalHead(children.length>1?'Record money for '+esc(state.settings.name):'Record money given')}<p class="modal-text">Use this after handing over the money. Only unlocked rewards and unpaid gifts are included.${el.dataset.week?` This payment is for ${weekLabel(el.dataset.week)}.`:' Older unpaid weeks are settled first.'}</p><form id="payment-form" data-week="${esc(el.dataset.week||'')}" data-payment-id="${crypto.randomUUID()}"><label class="field">How much have you given her? (£)<input name="amount" type="number" min="0.01" max="${(amount/100).toFixed(2)}" step="0.01" inputmode="decimal" value="${(amount/100).toFixed(2)}" required></label><div class="form-actions"><button class="btn light" type="button" data-action="close">Cancel</button><button class="btn" type="submit">Yes, record this payment</button></div></form>`);return;}
  if(a==='refresh'){await refresh();toast('You’re up to date.');return;}
+ if(a==='delete-child'&&canDeleteChild()){
+   const current=children.find(c=>c.id===selectedChild);
+   const label=current?childLabel(current):state.settings.name;
+   showModal(`${modalHead('Delete '+esc(label)+'?')}<p class="modal-text">This permanently deletes this profile’s chores, approvals, pocket-money history and savings goals. Tablets and pairing links for this child will stop working.</p><div class="form-actions"><button class="btn light" data-action="close">Keep profile</button><button class="btn danger" data-action="confirm-delete-child" data-child-id="${esc(selectedChild)}">Delete profile permanently</button></div>`);
+   return;
+ }
+ if(a==='confirm-delete-child'&&canDeleteChild()&&el.dataset.childId===selectedChild){
+   busy=true;refreshGeneration++;
+   try{
+     const id=selectedChild;
+     if(config.configured)await request('deleteChild',{},id);
+     else{
+       const profiles=demoSiblings();
+       delete profiles[id];
+       localStorage.setItem(demoSiblingsKey,JSON.stringify(profiles));
+       selectedChild='primary';
+     }
+     inboxChild='';
+     modal.close();
+     await refresh();
+     toast('Child profile deleted.');
+   }finally{busy=false;}
+   return;
+ }
  if(a==='add-child'){
    showModal(`${modalHead('Add a child')}<form id="add-child-form" data-child-id="${crypto.randomUUID()}"><label class="field">Child’s name<input name="name" maxlength="30" required autocomplete="off"></label><label class="field">Starting chores<select name="chores"><option value="starter">Use starter chores</option><option value="copy">Copy chores from ${esc(state.settings.name)}</option></select></label><div class="form-actions"><button class="btn light" type="button" data-action="close">Cancel</button><button class="btn" type="submit">Add child</button></div></form>`);
    return;
@@ -431,7 +466,15 @@ async function refresh(asParent=false){
  const generation=++refreshGeneration;
  if(config.configured){
    if(!parentSession&&!deviceToken){state=null;render();return;}
-   const result=await request('snapshot');
+   let result;
+   try{result=await request('snapshot');}
+   catch(error){
+     if(!parentSession||error.code!=='CHILD_PROFILE_MISSING')throw error;
+     if(generation!==refreshGeneration)return;
+     result=await request('snapshot',{},'primary');
+     if(generation!==refreshGeneration)return;
+     selectedChild='primary';inboxChild='';
+   }
    if(generation!==refreshGeneration)return;
    acceptProfile(result);role=result.role;
    if(asParent){view='parent';recordArea('parent');}

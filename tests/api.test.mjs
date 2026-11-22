@@ -69,11 +69,11 @@ test('Sibling device tokens scope reads and writes and a parent can review acros
  const primary=blankState(),sibling=blankState();
  primary.settings.name='Alex';sibling.settings.name='Sam';
  primary.settings.timeZone='America/New_York';
- let siblingRow={state:sibling,revision:0},newProfile,paired,deviceProfile,tokenHash;
+ let siblingRow={state:sibling,revision:0},newProfile,paired,deviceProfile,tokenHash,memberRole='owner';
  const handler=createHandler(env,async(url,opts)=>{
    const u=new URL(url),table=u.pathname.split('/').at(-1),method=opts.method,query=u.searchParams;
    if(table==='user')return Response.json({id:'parent-1'});
-   if(table==='lh_parent_members')return Response.json([{family_id:'family-1',role:'owner'}]);
+   if(table==='lh_parent_members')return Response.json([{family_id:'family-1',role:memberRole}]);
    if(table==='lh_devices'){
      if(method==='POST'){const d=JSON.parse(opts.body);deviceProfile=d.child_id;tokenHash=d.token_hash;return Response.json([]);}
      return Response.json([{family_id:'family-1',child_id:query.get('token_hash')==='eq.'+tokenHash?deviceProfile:null}]);
@@ -91,8 +91,13 @@ test('Sibling device tokens scope reads and writes and a parent can review acros
    if(table==='lh_children'){
      if(method==='POST'){newProfile=JSON.parse(opts.body);return new Response(null,{status:201});}
      if(query.get('family_id')!=='eq.family-1'||query.get('id')!=='eq.'+childId)return Response.json([]);
+     if(method==='DELETE'){
+       assert.equal(opts.headers.Prefer,'return=minimal');
+       siblingRow=null;
+       return new Response(null,{status:204});
+     }
      if(method==='PATCH')siblingRow=JSON.parse(opts.body);
-     return Response.json([siblingRow]);
+     return Response.json(siblingRow?[siblingRow]:[]);
    }
    if(table==='lh_parent_dashboard')return Response.json({
      children:[{id:'primary',name:'Alex'},{id:childId,name:'Sam'}],
@@ -135,4 +140,19 @@ test('Sibling device tokens scope reads and writes and a parent can review acros
  assert.equal(dashboard.inbox[0].childId,childId);
  assert.equal((await send('review',{id:dashboard.inbox[0].id,status:'approved'})).status,200);
  assert.equal(siblingRow.state.completions[0].status,'approved');
+ assert.equal((await send('deleteChild',{},tablet)).status,403);
+ assert.equal((await send('deleteChild',{},parent,'primary')).status,400);
+ memberRole='parent';
+ assert.equal((await send('deleteChild')).status,403);
+ memberRole='owner';
+ assert.equal((await send('deleteChild',{},parent,otherId)).status,200);
+ assert.ok(siblingRow);
+ assert.deepEqual(await (await send('deleteChild')).json(),{ok:true});
+ assert.equal(siblingRow,null);
+ const removed=await send('snapshot');
+ assert.equal(removed.status,404);
+ assert.equal((await removed.json()).code,'CHILD_PROFILE_MISSING');
+ assert.deepEqual(await (await send('deleteChild')).json(),{ok:true});
+ assert.equal((await (await send('snapshot',{},parent,'primary')).json()).state.settings.name,'Alex');
+
 });

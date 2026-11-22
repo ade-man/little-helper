@@ -106,5 +106,23 @@ test('Demo UI records early work, releases rewards and records gifts and partial
    assert.equal(sam().completions[0].status,'approved');
    assert.match(app.innerHTML,/All caught up!/);
    assert.notEqual(JSON.parse(store.get('little-helpers-demo-v1')).settings.name,'Sam');
+   await click('admin-tab',{tab:'settings'});
+   assert.doesNotMatch(app.innerHTML,/Delete selected profile/);
+   const duplicate='22222222-2222-4222-8222-222222222222';
+   await click('add-child');
+   await form('add-child-form',{name:'Sam',chores:'starter'},{childId:duplicate});
+   assert.match(app.innerHTML,/Sam \(profile 2\)/);
+   assert.match(app.innerHTML,/Sam \(profile 3\)/);
+   assert.match(app.innerHTML,/0 recorded chores/);
+   await click('delete-child');
+   assert.match(modal.innerHTML,/Delete Sam \(profile 3\)\?/);
+   await click('close');
+   assert.ok(JSON.parse(store.get('little-helpers-demo-siblings'))[duplicate]);
+   await click('delete-child');
+   await click('confirm-delete-child',{childId:duplicate});
+   assert.equal(JSON.parse(store.get('little-helpers-demo-siblings'))[duplicate],undefined);
+   assert.equal(sam().completions[0].status,'approved');
+   assert.doesNotMatch(app.innerHTML,/Delete selected profile/);
+
  }finally{globalThis.setInterval=interval;globalThis.setTimeout=timeout;}
 });

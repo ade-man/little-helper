@@ -142,3 +142,5 @@ Open **Parent dashboard → Family settings → Add child**. Start with the defa
 Parents share a family time zone and pocket-money day, edited on the first profile. The API reads one child's full state at a time. The family inbox projects pending jobs from all profiles while the review screen is open.
 
 Apply the sibling-profile migration in `supabase/migrations/` after the initial schema and parent-access SQL. Apply it before deploying the updated Edge Function, then release Sites and Netlify. The migration preserves the first child's existing data and adds separate state rows for siblings. Older app builds continue to open the first child.
+
+The original parent can delete an additional profile in **Family settings → Children**. Select the child in **Managing child**, check the recorded chore count and unpaid balance, then confirm **Delete selected profile**. Deletion is permanent and disconnects that profile’s devices and unused pairing links. The first profile remains available.
