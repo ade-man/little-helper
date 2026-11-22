@@ -89,7 +89,7 @@ test('Sibling device tokens scope reads and writes and a parent can review acros
      return Response.json([{state:primary,revision:0}]);
    }
    if(table==='lh_children'){
-     if(method==='POST'){newProfile=JSON.parse(opts.body);return new Response(null,{status:204});}
+     if(method==='POST'){newProfile=JSON.parse(opts.body);return new Response(null,{status:201});}
      if(query.get('family_id')!=='eq.family-1'||query.get('id')!=='eq.'+childId)return Response.json([]);
      if(method==='PATCH')siblingRow=JSON.parse(opts.body);
      return Response.json([siblingRow]);
@@ -108,6 +108,11 @@ test('Sibling device tokens scope reads and writes and a parent can review acros
  assert.equal(newProfile.state.settings.name,'Taylor');
  assert.deepEqual(newProfile.state.tasks,primary.tasks.filter(t=>t.active));
  for(const key of ['completions','payouts','credits','goals'])assert.deepEqual(newProfile.state[key],[]);
+ const starterId='33333333-3333-4333-8333-333333333333';
+ const starter=await send('addChild',{id:starterId,name:'Robin',copyTasks:false},parent,'primary');
+ assert.equal(starter.status,200);
+ assert.deepEqual(await starter.json(),{ok:true});
+ assert.deepEqual(newProfile.state.tasks,blankState().tasks);
  assert.equal((await send('pair',{},parent,otherId)).status,404);
  const pair=await (await send('pair')).json();
  assert.equal(paired.child_id,childId);

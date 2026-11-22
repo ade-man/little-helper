@@ -17,7 +17,8 @@ export function createHandler(env=process.env,fetcher=fetch){
    if(!secret.startsWith('sb_secret_'))headers.Authorization='Bearer '+secret;
    const res=await fetcher(url+'/rest/v1/'+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(10000)});
    if(!res.ok)throw new HttpError('The family database could not be reached. Please try again.',503);
-   return res.status===204?[]:res.json();
+   if(res.status===204||prefer.split(',').includes('return=minimal'))return [];
+   return res.json();
  }
  async function device(family,creator,childId){const t=token();await db('lh_devices','POST',{token_hash:hash(t),family_id:family,created_by:creator,...(childId?{child_id:childId}:{}),expires_at:new Date(Date.now()+30*86400000).toISOString()});return t;}
  return async function handler(req){
