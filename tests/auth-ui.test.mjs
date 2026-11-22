@@ -49,5 +49,17 @@ test('Parent onboarding separates account creation, confirmation and sign-in req
    location.href='https://family.example/?area=parent';
    await import('../dist/app.mjs?parent-link-on-child-device');await new Promise(resolve=>setImmediate(resolve));
    assert.match(app.innerHTML,/Sign in to your family/);assert.doesNotMatch(app.innerHTML,/Parent administration|My everyday essentials/);
+   assert.match(app.innerHTML,/<button type="button" class="btn secondary auth-child-return" data-action="back-child">/);
+   const originalHistory=globalThis.history;
+   globalThis.history={replaceState(_state,_title,path){location.href=new URL(path,location.href).href;}};
+   try{
+     await action('back-child');
+     assert.match(app.innerHTML,/My everyday essentials/);
+     assert.equal(new URL(location.href).searchParams.get('area'),'child');
+     assert.equal(calls.at(-1).options.headers.Authorization,'Device '+'a'.repeat(43));
+     await import('../dist/app.mjs?child-return-reload');await new Promise(resolve=>setImmediate(resolve));
+     assert.match(app.innerHTML,/My everyday essentials/);
+   }finally{globalThis.history=originalHistory;}
+
  }finally{Object.assign(globalThis,original);}
 });

@@ -69,3 +69,5 @@
 .profile-switcher{max-width:20rem;margin:0 0 1rem}
 .profile-switcher select{font-size:1rem}
 #add-child-form .field+.field{margin-top:1rem}
+
+.auth-panel .auth-child-return{width:100%;min-height:48px;margin-top:16px;font-size:1rem;color:#354c35}
