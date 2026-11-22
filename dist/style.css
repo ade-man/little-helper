@@ -65,3 +65,7 @@
 .week-col:focus-visible{outline:2px solid #526641;outline-offset:2px}
 .week-col:disabled{opacity:.65;cursor:default}
 #week-jobs h3{margin-top:20px}
+
+.profile-switcher{max-width:20rem;margin:0 0 1rem}
+.profile-switcher select{font-size:1rem}
+#add-child-form .field+.field{margin-top:1rem}

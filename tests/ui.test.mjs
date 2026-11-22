@@ -87,5 +87,24 @@ test('Demo UI records early work, releases rewards and records gifts and partial
    location.href='https://example.test/?demo=1&area=parent';
    await import('../dist/app.mjs?direct-parent-demo');await Promise.resolve();
    assert.match(app.innerHTML,/data-area="parent"/);assert.doesNotMatch(app.innerHTML,/My adventure|My week|My money/);
+   await click('admin-tab',{tab:'settings'});
+   await click('add-child');
+   assert.match(modal.innerHTML,/Copy chores from/);
+   const sibling='11111111-1111-4111-8111-111111111111';
+   await form('add-child-form',{name:'Sam',chores:'copy'},{childId:sibling});
+   assert.match(app.innerHTML,/id="child-profile"/);
+   assert.match(app.innerHTML,/name="name" value="Sam"/);
+   await click('child-view');assert.match(app.innerHTML,/Hi, Sam!/);
+   await click('submit',{id:'reading'});await click('close');
+   await click('parent');await click('admin-tab',{tab:'review'});
+   assert.match(app.innerHTML,/Sam · Thu 19 Nov/);
+   await handlers.change({target:{id:'child-profile',value:'primary'}});
+   await handlers.change({target:{id:'inbox-child',value:sibling}});
+   assert.doesNotMatch(app.innerHTML,/Fold the towels|Water the plants/);
+   const sam=()=>JSON.parse(store.get('little-helpers-demo-siblings'))[sibling];
+   await click('approve',{id:sam().completions[0].id,childId:sibling});
+   assert.equal(sam().completions[0].status,'approved');
+   assert.match(app.innerHTML,/All caught up!/);
+   assert.notEqual(JSON.parse(store.get('little-helpers-demo-v1')).settings.name,'Sam');
  }finally{globalThis.setInterval=interval;globalThis.setTimeout=timeout;}
 });

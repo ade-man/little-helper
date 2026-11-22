@@ -109,7 +109,7 @@ The tests verify early claims, original-day reward release, parent exceptions, a
 
 `shared/domain.mjs` is the single source for reward rules. Both the demo and server use it; server dates come from the family's time zone. The week view can request a completion date within the current week. The server validates that date and always determines the reward amount. A submission snapshots its task name, picture, and value. Later task edits preserve the agreed reward; resubmitting a returned job uses the current reward.
 
-Supabase stores one small JSON family aggregate with a revision counter, plus separate hashed pairing/device tokens, parent memberships and email-bound invitation hashes. Every change uses an atomic `UPDATE ... WHERE revision = old_revision`, retries after competing changes, and rechecks every rule. This keeps updates from multiple tablets from overwriting one another. All money is integer pennies.
+Supabase stores one JSON progress record and revision counter per child. The first child uses the original family row. Siblings use separate rows linked to that family, with shared parent memberships and child-specific hashed pairing and device tokens. Every change uses an atomic `UPDATE ... WHERE revision = old_revision`, retries after competing changes, and rechecks every rule. This keeps updates from multiple tablets from overwriting one another. All money is integer pennies.
 
 All tables have Row Level Security. A parent can directly read only family records they own or have explicitly joined through an invitation. Anonymous users cannot read tables; authenticated clients cannot write them. Only the backend's service identity writes state. Device tokens are random, expire, and are stored as SHA-256 hashes in the database. The API verifies a parent JWT with Supabase Auth or checks the child-device token on every request. Child requests are restricted to reading family progress, submitting jobs, looking up a product and setting their savings target.
 
@@ -134,3 +134,11 @@ The Supabase security advisor flags disabled [leaked-password protection](https:
 ## Verification limits
 
 Automated rule/API tests passed. The deployed Edge Function was checked for unauthenticated access rejection, expired device/pairing rejection, and CORS. Database grants and RLS were queried directly. Full browser and tablet testing, and a real parent's email-confirmation/sign-in flow, still need to be completed; the managed browser test tool was unavailable in the build environment.
+
+## Sibling profiles
+
+Open **Parent dashboard → Family settings → Add child**. Start with the default chores or copy the active chores from the profile currently selected. Copying includes reward amounts and repeat rules. Each profile has its own history, payments, and savings goals. Use **Managing child** to switch profiles and **Filter approvals** to narrow the family inbox. Pair a tablet from the child's selected profile. Existing pairing links and tablets continue to open the first child.
+
+Parents share a family time zone and pocket-money day, edited on the first profile. The API reads one child's full state at a time. The family inbox projects pending jobs from all profiles while the review screen is open.
+
+Apply the sibling-profile migration in `supabase/migrations/` after the initial schema and parent-access SQL. Apply it before deploying the updated Edge Function, then release Sites and Netlify. The migration preserves the first child's existing data and adds separate state rows for siblings. Older app builds continue to open the first child.

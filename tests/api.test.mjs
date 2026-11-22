@@ -62,3 +62,72 @@ test('Dated child submissions use the server clock in the family time zone',asyn
  assert.equal(m.getState().completions[0].date,'2026-11-16');
  assert.equal(m.calls.filter(c=>c.opts.method==='PATCH').length,2);
 });
+
+test('Sibling device tokens scope reads and writes and a parent can review across profiles',async()=>{
+ const childId='11111111-1111-4111-8111-111111111111';
+ const otherId='22222222-2222-4222-8222-222222222222';
+ const primary=blankState(),sibling=blankState();
+ primary.settings.name='Alex';sibling.settings.name='Sam';
+ primary.settings.timeZone='America/New_York';
+ let siblingRow={state:sibling,revision:0},newProfile,paired,deviceProfile,tokenHash;
+ const handler=createHandler(env,async(url,opts)=>{
+   const u=new URL(url),table=u.pathname.split('/').at(-1),method=opts.method,query=u.searchParams;
+   if(table==='user')return Response.json({id:'parent-1'});
+   if(table==='lh_parent_members')return Response.json([{family_id:'family-1',role:'owner'}]);
+   if(table==='lh_devices'){
+     if(method==='POST'){const d=JSON.parse(opts.body);deviceProfile=d.child_id;tokenHash=d.token_hash;return Response.json([]);}
+     return Response.json([{family_id:'family-1',child_id:query.get('token_hash')==='eq.'+tokenHash?deviceProfile:null}]);
+   }
+   if(table==='lh_pairings'){
+     if(method==='POST'){paired=JSON.parse(opts.body);return Response.json([]);}
+     return Response.json([{family_id:paired.family_id,created_by:paired.created_by,child_id:paired.child_id}]);
+   }
+   if(table==='lh_families'){
+     const select=query.get('select');
+     if(select.includes('timeZone'))return Response.json([{timeZone:primary.settings.timeZone,payday:'2'}]);
+     if(select.includes('tasks'))return Response.json([{tasks:primary.tasks}]);
+     return Response.json([{state:primary,revision:0}]);
+   }
+   if(table==='lh_children'){
+     if(method==='POST'){newProfile=JSON.parse(opts.body);return new Response(null,{status:204});}
+     if(query.get('family_id')!=='eq.family-1'||query.get('id')!=='eq.'+childId)return Response.json([]);
+     if(method==='PATCH')siblingRow=JSON.parse(opts.body);
+     return Response.json([siblingRow]);
+   }
+   if(table==='lh_parent_dashboard')return Response.json({
+     children:[{id:'primary',name:'Alex'},{id:childId,name:'Sam'}],
+     inbox:siblingRow.state.completions.filter(c=>c.status==='pending').map(c=>({...c,childId}))
+   });
+   throw Error('Unexpected request '+table);
+ });
+ const send=(action,data={},auth=parent,profile=childId,extras={})=>handler(new Request('https://example.test/api',{
+   method:'POST',headers:{Authorization:auth},body:JSON.stringify({action,data,childId:profile,...extras})
+ }));
+ primary.tasks[0].active=false;
+ assert.equal((await send('addChild',{id:otherId,name:'Taylor',copyTasks:true},parent,'primary')).status,200);
+ assert.equal(newProfile.state.settings.name,'Taylor');
+ assert.deepEqual(newProfile.state.tasks,primary.tasks.filter(t=>t.active));
+ for(const key of ['completions','payouts','credits','goals'])assert.deepEqual(newProfile.state[key],[]);
+ assert.equal((await send('pair',{},parent,otherId)).status,404);
+ const pair=await (await send('pair')).json();
+ assert.equal(paired.child_id,childId);
+ const redeemed=await (await send('redeemPair',{code:pair.code},'')).json();
+ const tablet='Device '+redeemed.token;
+ const legacy=await (await send('snapshot',{},child,childId,{dashboard:true})).json();
+ assert.equal(legacy.state.settings.name,'Alex');
+ assert.equal(legacy.children,undefined);
+ const childSnapshot=await (await send('snapshot',{},tablet,'primary',{dashboard:true,inbox:true})).json();
+ assert.equal(childSnapshot.state.settings.name,'Sam');
+ assert.equal(childSnapshot.state.settings.timeZone,'America/New_York');
+ assert.equal(childSnapshot.state.settings.payday,2);
+ assert.equal(childSnapshot.children,undefined);
+ assert.equal(childSnapshot.inbox,undefined);
+ assert.equal((await send('addChild',{name:'Child'},tablet)).status,403);
+ assert.equal((await send('submit',{taskId:'reading'},tablet,'primary')).status,200);
+ assert.equal(primary.completions.length,0);
+ const dashboard=await (await send('snapshot',{},parent,'primary',{dashboard:true,inbox:true})).json();
+ assert.equal(dashboard.state.settings.name,'Alex');
+ assert.equal(dashboard.inbox[0].childId,childId);
+ assert.equal((await send('review',{id:dashboard.inbox[0].id,status:'approved'})).status,200);
+ assert.equal(siblingRow.state.completions[0].status,'approved');
+});
