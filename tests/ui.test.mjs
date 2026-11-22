@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 // A lightweight DOM adapter checks template rendering and the event-driven
 // demo workflow. It is not a layout, browser, accessibility or tablet test.
-test('Demo UI records early work, releases rewards and records gifts and partial payments',async()=>{
+test('Demo UI records early work, releases rewards and records gifts and partial payments',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-19T12:00:00Z')});
  const handlers={};const store=new Map();
  const storage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
  const node=()=>({innerHTML:'',textContent:'',classList:{add(){},remove(){}},querySelector:()=>null,addEventListener(){},append(){},setAttribute(){}});
@@ -19,7 +20,20 @@ test('Demo UI records early work, releases rewards and records gifts and partial
    const cards=[...extras.matchAll(/<article class="task-card[\s\S]*?<\/article>/g)].map(m=>m[0]);assert.ok(cards.length>=6);
    for(const card of cards){assert.ok(card.indexOf('task-picture')<card.indexOf('task-listen'));assert.ok(card.indexOf('task-listen')<card.indexOf('class="reward"'));assert.equal((card.match(/data-action="listen"/g)||[]).length,1);assert.doesNotMatch(card,/position:absolute/);}
    const click=async(action,extra={})=>handlers.click({preventDefault(){},target:{closest(){return {dataset:{action,...extra}};}}});
+   await click('nav',{view:'week'});
+   assert.match(app.innerHTML,/data-date="2026-11-20"[^>]*disabled/);
+   await click('week-day',{date:'2026-11-18'});
+   assert.match(app.innerHTML,/data-date="2026-11-18" aria-pressed="true"/);
+   assert.match(app.innerHTML,/Jobs for Wednesday 18 Nov/);
+   assert.match(app.innerHTML,/data-id="plants" data-date="2026-11-18"/);
+   await click('submit',{id:'plants',date:'2026-11-18'});
+   assert.match(modal.innerHTML,/for Wednesday 18 Nov/);
+   assert.doesNotMatch(app.innerHTML,/data-id="plants" data-date="2026-11-18"/);
+   const late=JSON.parse(store.get('little-helpers-demo-v1')).completions.at(-1);
+   assert.equal(late.date,'2026-11-18');
+   await click('close');
    await click('parent');assert.match(app.innerHTML,/Review completed tasks/);assert.match(app.innerHTML,/data-area="parent"/);assert.match(app.innerHTML,/Parent administration/);assert.doesNotMatch(app.innerHTML,/My adventure|My week|My money/);
+   assert.match(app.innerHTML,/Wed 18 Nov · Extra helping · £0.50/);
    await click('admin-tab',{tab:'tasks'});assert.match(app.innerHTML,/Add task/);assert.match(app.innerHTML,/data-action="edit-task"/);assert.doesNotMatch(app.innerHTML,/I did it!/);
    await click('admin-tab',{tab:'settings'});assert.match(app.innerHTML,/id="settings-form"/);assert.match(app.innerHTML,/4 essential tasks/);assert.doesNotMatch(app.innerHTML,/name="threshold"/);
    await click('admin-tab',{tab:'payouts'});assert.match(app.innerHTML,/All money waiting to be paid/);

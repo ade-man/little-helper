@@ -47,3 +47,18 @@ test('Paired children can add and remove dream toys without touching financial r
  for(const key of ['tasks','completions','payouts','credits'])assert.deepEqual(m.getState()[key],before[key]);
  assert.equal((await h(post('addMoney',{title:'My reward',amount:99999},child))).status,403);
 });
+
+test('Dated child submissions use the server clock in the family time zone',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-17T02:00:00Z')});
+ const m=mockDb(),h=createHandler(env,m.fetcher);
+ m.getState().settings.timeZone='America/New_York';
+ const invalid=await h(post('submitForDate',{taskId:'reading',date:'2026-11-17'},child));
+ assert.equal(invalid.status,400);
+ assert.equal(m.calls.filter(c=>c.opts.method==='PATCH').length,0);
+ m.getState().settings.timeZone='Europe/London';
+ m.conflict();
+ const monday=await h(post('submitForDate',{taskId:'reading',date:'2026-11-16'},child));
+ assert.equal(monday.status,200);
+ assert.equal(m.getState().completions[0].date,'2026-11-16');
+ assert.equal(m.calls.filter(c=>c.opts.method==='PATCH').length,2);
+});

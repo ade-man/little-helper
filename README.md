@@ -17,6 +17,19 @@ A tablet-friendly pocket-money adventure for a child, with a separate parent das
 - Payouts support partial payments across weeks, settling older amounts first, and are a record of money handed over by a parent. There are no bank connections or transfers.
 - Secure parent login, one-time child-tablet pairing links, device revocation, and cross-device updates every 30 seconds.
 
+## Logging a missed job
+
+In **My week**, choose today or an earlier day of the current Monday–Sunday week and send an available job for approval. The family time zone sets the cutoff. Daily jobs can be sent once per day, and weekly jobs once per week. In the week view, a returned job can be sent again from its original day while the week is open. Parents can review pending jobs after the week ends.
+
+The request uses the active task list, reward and essentials at submission. The selected completion date determines where stars and earnings appear and which day's essentials unlock a paid job.
+
+### Release order
+
+1. Run `npm run build`, `node scripts/prepare-edge.mjs` and `npm test`.
+2. Deploy the updated `little-helpers-api` Supabase Edge Function using the existing function deployment setup. The release requires no database migration. If a Netlify deployment is configured to use its same-origin API, its updated function ships with the site.
+3. Publish the prepared Sites version and release the same revision to Netlify through its existing deployment workflow. An older backend rejects the new dated submission action, so deploy the Edge Function before releasing a frontend that uses it.
+4. Smoke-test with a paired test tablet and parent account. Select an earlier day in **My week**, submit an eligible job and verify the parent queue and child history show that date.
+
 ## Current hosted setup
 
 Supabase project: `little-helpers` (`iuokuddczsrgvneqnaqn`), in Allenby Systems, London region.
@@ -94,7 +107,7 @@ The tests verify early claims, original-day reward release, parent exceptions, a
 
 ## Architecture and access
 
-`shared/domain.mjs` is the single source for reward rules. Both the demo and server use it; server dates come from the family's time zone. The client cannot submit a different completion date or reward amount. A submission snapshots its task name, picture, and value. Later task edits preserve the agreed reward; resubmitting a returned job uses the current reward.
+`shared/domain.mjs` is the single source for reward rules. Both the demo and server use it; server dates come from the family's time zone. The week view can request a completion date within the current week. The server validates that date and always determines the reward amount. A submission snapshots its task name, picture, and value. Later task edits preserve the agreed reward; resubmitting a returned job uses the current reward.
 
 Supabase stores one small JSON family aggregate with a revision counter, plus separate hashed pairing/device tokens, parent memberships and email-bound invitation hashes. Every change uses an atomic `UPDATE ... WHERE revision = old_revision`, retries after competing changes, and rechecks every rule. This keeps updates from multiple tablets from overwriting one another. All money is integer pennies.
 

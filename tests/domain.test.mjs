@@ -95,3 +95,33 @@ test('Settings no longer accept a configurable unlock target; money validation i
  const updated=act(s,'settings',{...s.settings,threshold:0});assert.equal(updated.settings.threshold,undefined);assert.equal(stats(updated,date).essentialsTotal,4);
  assert.throws(()=>act(s,'settings',{...s.settings,savingGoal:-1}),/Goals/);assert.equal(taskStatus(s,s.tasks[0],date).status,'approved');
 });
+
+test('Dated claims are restricted to today or past days of the current Monday–Sunday week',()=>{
+ const today='2026-11-18',monday='2026-11-16',state=blankState(today);
+ for(const date of [undefined,null,'2026-11-31','2026-11-15','2026-11-19']){
+   assert.throws(()=>act(state,'submitForDate',{taskId:'reading',date},'child',today),/earlier day this week/);
+ }
+ const earlier=act(state,'submitForDate',{taskId:'reading',date:monday},'child',today);
+ assert.equal(earlier.completions[0].date,monday);
+ assert.throws(()=>act(earlier,'submitForDate',{taskId:'reading',date:monday},'child',today),/already sent/);
+ const current=act(earlier,'submitForDate',{taskId:'reading',date:today},'child',today);
+ assert.deepEqual(current.completions.map(c=>c.date),[monday,today]);
+});
+
+test('A returned weekly claim can be sent again from its original date in My week',()=>{
+ const today='2026-11-18',monday='2026-11-16';
+ let state=act(blankState(today),'submitForDate',{taskId:'plants',date:monday},'child',today);
+ const {id}=state.completions[0];
+ assert.throws(()=>act(state,'submitForDate',{taskId:'plants',date:today},'child',today),/already sent/);
+ state=act(state,'review',{id,status:'retry'},'parent',today);
+ assert.throws(()=>act(state,'submitForDate',{taskId:'plants',date:today},'child',today),/original day/);
+ state=act(state,'submitForDate',{taskId:'plants',date:monday},'child',today);
+ assert.deepEqual(state.completions.map(c=>[c.id,c.date,c.status]),[[id,monday,'pending']]);
+ const nextWeek='2026-11-23';
+ state=act(state,'review',{id,status:'approved'},'parent',nextWeek);
+ assert.equal(stats(state,nextWeek).totalHeld,50);
+ state=finishEssentials(state,today);
+ assert.equal(stats(state,nextWeek).totalHeld,50);
+ state=finishEssentials(state,monday);
+ assert.equal(stats(state,nextWeek).previousUnpaid,50);
+});

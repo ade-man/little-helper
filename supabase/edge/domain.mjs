@@ -67,6 +67,9 @@ export function demoState(date=localDate()) {
 }
 function requireParent(role) {if(role!=='parent') throw new Error('A grown-up needs to do this.');}
 function validDate(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(new Date(value+'T12:00:00Z').getTime())&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value;}
+export function isOpenWeekDate(value,today) {
+  return validDate(value)&&value>=weekOf(today)&&value<=today;
+}
 function reference(value,fallback){if(value===undefined)return fallback;if(typeof value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))throw new Error('This entry reference is not valid. Please reopen the form.');return value;}
 function releaseEligibleRewards(s,date){
   const approvedByDate=new Map();for(const c of s.completions)if(c.status==='approved'){if(!approvedByDate.has(c.date))approvedByDate.set(c.date,new Set());approvedByDate.get(c.date).add(c.taskId);}
@@ -79,14 +82,18 @@ function goalUrl(value) {
 }
 export function applyAction(state,action,data={},role='child',date=localDate(),id=globalThis.crypto.randomUUID()) {
   const s=structuredClone(state); const current=stats(s,date);
-  if(action==='submit') {
+  if(action==='submit'||action==='submitForDate') {
+    const forDate=action==='submitForDate';
+    const requestedDate=forDate?data.date:date;
+    if(forDate&&!isOpenWeekDate(requestedDate,date)) throw new Error('Choose today or an earlier day this week.');
     const t=s.tasks.find(t=>t.id===data.taskId&&t.active);
     if(!t) throw new Error('This job is no longer available.');
-    const old=taskStatus(s,t,date);
+    const old=taskStatus(s,t,requestedDate);
     if(old&&old.status!=='retry') throw new Error('You have already sent this job for review.');
+    if(forDate&&old&&old.date!==requestedDate) throw new Error('Send this job again from its original day.');
     const requirements=s.tasks.filter(t=>t.active&&t.essential).map(t=>t.id);
-    if(old) {old.status='pending';old.note='';old.value=t.essential?0:t.value;old.date=date;if(!t.essential){old.rewardReleased=false;old.requiredEssentialIds=requirements;}}
-    else s.completions.push({id,taskId:t.id,title:t.title,icon:t.icon,date,essential:t.essential,value:t.essential?0:t.value,status:'pending',note:'',...(!t.essential?{rewardReleased:false,requiredEssentialIds:requirements}:{})});
+    if(old) {old.status='pending';old.note='';old.value=t.essential?0:t.value;old.date=requestedDate;if(!t.essential){old.rewardReleased=false;old.requiredEssentialIds=requirements;}}
+    else s.completions.push({id,taskId:t.id,title:t.title,icon:t.icon,date:requestedDate,essential:t.essential,value:t.essential?0:t.value,status:'pending',note:'',...(!t.essential?{rewardReleased:false,requiredEssentialIds:requirements}:{})});
   } else if(action==='review') {
     requireParent(role); const c=s.completions.find(c=>c.id===data.id);
     if(!c||c.status!=='pending') throw new Error('This job has already been reviewed.');
